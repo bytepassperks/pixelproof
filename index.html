@@ -1,25 +1,83 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Private browser-local image tools for serious batches.">
-  <title>Private browser image tools</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Private image tools that run in your browser. Compress, resize, export, watermark, and remove backgrounds with control.">
+  <title>PixelProof — serious image work, private by default</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <header class="topbar"><a class="brand" href="./"><span class="brand-mark">PP</span><span data-brand>PixelProof</span></a><span class="privacy">LOCAL ONLY / NEVER UPLOADED</span><button class="help" id="about-button">How it works</button></header>
-  <main class="shell">
-    <aside class="sidebar" aria-label="Tools"><p class="eyebrow">IMAGE WORKBENCH</p><nav id="tool-nav"></nav><div class="sidebar-note"><b>PRIVATE BY DEFAULT</b><span>Your files stay in this tab. Nothing is sent to a server.</span></div></aside>
-    <section class="workbench">
-      <div class="heading"><div><p class="eyebrow" id="tool-kicker">TOOL / COMPRESS</p><h1 id="tool-title">Compress without guessing.</h1><p id="tool-description">Control quality while seeing the output size before you download.</p></div><div class="isolation"><span id="isolation-dot"></span><span id="isolation-text">Checking local runtime…</span></div></div>
-      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose images"><div class="drop-icon">＋</div><h2>Drop images here</h2><p>or choose files / a folder</p><div class="drop-actions"><button class="btn primary" id="choose-files">Choose files</button><button class="btn" id="choose-folder">Choose folder</button></div><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><input id="folder-input" type="file" accept="image/jpeg,image/png,image/webp" webkitdirectory multiple hidden><small>JPEG · PNG · WebP · batch-ready</small></div>
-      <div id="file-summary" class="file-summary" hidden></div>
-      <section class="controls card" id="controls" hidden><div class="control-head"><span class="eyebrow">OPERATION SET</span><button class="text-button" id="reset-tool">Reset</button></div><div id="control-content"></div><div class="run-row"><button class="btn primary" id="run-button">Process images</button><span id="run-status" role="status"></span></div></section>
-      <section class="results card" id="results" hidden><div class="control-head"><span class="eyebrow">OUTPUTS</span><button class="btn" id="download-zip" hidden>Download ZIP</button></div><div id="result-list"></div></section>
+<body class="landing">
+  <header class="landing-nav">
+    <a class="brand" href="./"><span class="brand-mark">PP</span><span data-brand>PixelProof</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#tools">Tools</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn" href="app.html">Open the workbench</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero landing-section">
+      <div class="hero-copy">
+        <p class="eyebrow">PRIVATE IMAGE WORK / BROWSER-LOCAL</p>
+        <h1>Serious image work.<br><mark>Private by default.</mark></h1>
+        <p class="hero-lede">Compress, resize, crop, watermark, export for the web, and cut out a subject without uploading your files.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="app.html">Open the workbench <span>→</span></a>
+          <a class="btn" href="#pricing">See lifetime plans</a>
+        </div>
+        <p class="hero-note mono">NO UPLOAD ENDPOINT · NO SUBSCRIPTION REQUIRED</p>
+      </div>
+      <div class="hero-card card-offset">
+        <div class="mock-window">
+          <div class="mock-top"><span>PIXELPROOF / IMAGE WORKBENCH</span><span class="mock-dot"></span></div>
+          <div class="mock-body"><span class="eyebrow">ASSISTED / BACKGROUND</span><h2>Click the subject.<br>Keep the edges.</h2><div class="mock-image"><span>＋</span></div><div class="mock-line"></div><div class="mock-line short"></div></div>
+        </div>
+      </div>
     </section>
+
+    <section class="trust-strip"><span>FILES STAY IN YOUR BROWSER</span><span>NO SERVER-SIDE IMAGE PROCESSING</span><span>LOCAL WORKER PIPELINE</span></section>
+
+    <section id="tools" class="landing-section tools-section">
+      <div class="section-heading"><p class="eyebrow">THE WORKBENCH</p><h2>One place for the work between camera and checkout.</h2><p>Small jobs and serious batches use the same private browser-local tools.</p></div>
+      <div class="tool-cards">
+        <article class="landing-card"><span class="card-number">01</span><h3>Prepare</h3><p>Compress with quality feedback, resize by dimensions or preset, crop precisely, and rotate or flip.</p></article>
+        <article class="landing-card accent-card"><span class="card-number">02</span><h3>Finish</h3><p>Convert between JPEG, PNG, and WebP. Add a text or image watermark and strip metadata on export.</p></article>
+        <article class="landing-card"><span class="card-number">03</span><h3>Publish</h3><p>Emit correctly named WordPress and Shopify sizes, then download the full batch as a ZIP.</p></article>
+        <article class="landing-card yellow-card"><span class="card-number">04</span><h3>Cut out</h3><p>Click a subject, refine it into continuous alpha, preview on multiple backgrounds, and export PNG.</p></article>
+      </div>
+    </section>
+
+    <section class="benefit-band landing-section">
+      <div><p class="eyebrow">WHY LOCAL?</p><h2>Your image is not our infrastructure problem.</h2></div>
+      <div class="benefit-list"><p><strong>Private.</strong> Images never leave the tab.</p><p><strong>Practical.</strong> Batch tools and responsive web presets do the repetitive work.</p><p><strong>Honest.</strong> Browser memory is the ceiling. Glass is still hard. We say so.</p></div>
+    </section>
+
+    <section class="comparison landing-section">
+      <div class="section-heading"><p class="eyebrow">A DIFFERENT TRADE-OFF</p><h2>Pay once. Keep the files local.</h2></div>
+      <div class="comparison-wrap"><table><thead><tr><th>Capability</th><th>PixelProof</th><th>Typical online editor</th><th>Desktop editor</th></tr></thead><tbody><tr><td>Files uploaded</td><td class="yes">No</td><td>Usually</td><td class="yes">No</td></tr><tr><td>Batch web presets</td><td class="yes">Included</td><td>Varies</td><td>Manual setup</td></tr><tr><td>Subscription required</td><td class="yes">No</td><td>Often</td><td>Often</td></tr><tr><td>Prompted alpha cutout</td><td class="yes">Included in paid tiers</td><td>Varies</td><td>Varies</td></tr></tbody></table></div>
+    </section>
+
+    <section id="pricing" class="pricing landing-section">
+      <div class="section-heading"><p class="eyebrow">WORKING PLANS</p><h2>Choose your ceiling, not another subscription.</h2><p>Prices are current working values and may change before launch.</p></div>
+      <div class="pricing-grid">
+        <article class="price-card"><p class="eyebrow">FREE</p><h3>$0</h3><p>Try the core workbench locally.</p><ul><li>10 tasks per day</li><li>Batches up to 5 files</li><li>Core image tools</li><li>Background removal not included</li></ul><button class="btn" data-checkout="free">Start free</button></article>
+        <article class="price-card featured"><p class="eyebrow">LIFETIME SOLO</p><h3>$49 <small>once</small></h3><p>For one person doing real image work.</p><ul><li>Unlimited tasks</li><li>Batches up to 100 files</li><li>Prompted alpha cutout</li><li>Personal use</li></ul><button class="btn primary" data-checkout="solo">Choose Solo <span>→</span></button></article>
+        <article class="price-card"><p class="eyebrow">LIFETIME STUDIO</p><h3>$99 <small>once</small></h3><p>For a small team serving clients.</p><ul><li>Unlimited tasks</li><li>Batches up to 250 files</li><li>Prompted alpha cutout</li><li>Commercial and client use</li></ul><button class="btn" data-checkout="studio">Choose Studio</button></article>
+      </div>
+      <p id="checkout-status" class="mono landing-status" role="status"></p>
+    </section>
+
+    <section id="faq" class="faq landing-section">
+      <div class="section-heading"><p class="eyebrow">FAQ</p><h2>Plain answers before you buy.</h2></div>
+      <div class="faq-list"><details><summary>Do my images get uploaded?</summary><p>No. PixelProof has no image upload endpoint. Processing runs in your browser; the licensing Worker only handles checkout and licence validation.</p></details><details><summary>Is background removal automatic?</summary><p>No. It is click-to-select. You choose the subject, and the browser refines that selection into continuous alpha. People, animals, and products are the strongest cases.</p></details><details><summary>What about glass and transparent objects?</summary><p>They remain a known weakness. A single photograph often does not contain enough information to separate glass, reflections, refraction, and the background reliably.</p></details><details><summary>Can I process unlimited file sizes?</summary><p>No. Browser memory and decoded image dimensions are real ceilings. PixelProof rejects images above its configured pixel limit rather than pretending a tab has infinite memory.</p></details><details><summary>What formats are supported?</summary><p>JPEG, PNG, and WebP. Unsupported formats are not advertised.</p></details></div>
+    </section>
+
+    <section class="final-cta landing-section"><p class="eyebrow">READY WHEN YOU ARE</p><h2>Keep the pixels. Lose the upload step.</h2><a class="btn primary" href="app.html">Open PixelProof <span>→</span></a></section>
   </main>
-  <dialog id="about-dialog"><button class="dialog-close" id="close-about" aria-label="Close">×</button><p class="eyebrow">PIXELPROOF / LOCAL RUNTIME</p><h2>Your images stay in your browser.</h2><p>Every operation runs with browser canvas APIs and Web Workers. No upload endpoint exists in this phase. Large batches use a small worker window to keep memory bounded.</p><p class="mono">crossOriginIsolated: <b id="dialog-isolation"></b></p></dialog>
   <footer><span data-brand>PixelProof</span><span>PRIVATE IMAGE WORK / v1</span><span>NO UPLOADS · NO SERVER INFERENCE</span></footer>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="landing.js"></script>
 </body>
 </html>

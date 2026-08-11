@@ -2,6 +2,8 @@ export const PRODUCT = Object.freeze({
   brand: 'PixelProof',
   tagline: 'Serious image work. Private by default.',
   version: '1.0.0',
+  workerUrl: 'https://pixelproof-license.getlaunchpod.workers.dev',
+  modelMirrorUrl: 'https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev',
   maxPixels: 64_000_000,
   maxBatchFiles: 100,
   concurrency: 2,
@@ -15,9 +17,32 @@ export const PRODUCT = Object.freeze({
 });
 
 export const TIERS = Object.freeze({
-  current: 'unlimited',
-  // Phase 3 entitlement gates belong here; tools must not own billing logic.
-  limits: {maxFiles: Infinity, maxPixels: PRODUCT.maxPixels},
+  current: 'free',
+  free: Object.freeze({
+    label: 'Free',
+    price: 0,
+    tasksPerDay: 10,
+    maxFiles: 5,
+    backgroundRemoval: false,
+    clientUse: false,
+  }),
+  solo: Object.freeze({
+    label: 'Lifetime Solo',
+    price: 49,
+    tasksPerDay: Infinity,
+    maxFiles: 100,
+    backgroundRemoval: true,
+    clientUse: false,
+  }),
+  studio: Object.freeze({
+    label: 'Lifetime Studio',
+    price: 99,
+    tasksPerDay: Infinity,
+    maxFiles: 250,
+    backgroundRemoval: true,
+    clientUse: true,
+  }),
+  limits: {maxFiles: 5, maxPixels: PRODUCT.maxPixels},
 });
 
 export const MIME = Object.freeze({

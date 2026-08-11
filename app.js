@@ -1,7 +1,12 @@
-import { PRODUCT, MIME, TIERS } from "./config.js";
+import { PRODUCT, MIME } from "./config.js";
 import { registerTool, listTools } from "./registry.js";
 import { downloadZip } from "./zip.js";
-import { canUseTool } from "./entitlements.js";
+import {
+  canUseTool,
+  getEntitlementState,
+  limitMessage,
+  recordTask,
+} from "./entitlements.js";
 import { mountBackgroundTool } from "./background-removal.js";
 
 const toolDefs = [
@@ -142,11 +147,11 @@ function addFiles(list) {
     /^image\/(jpeg|png|webp)$/.test(f.type),
   );
   if (!incoming.length) return;
-  state.files = [...state.files, ...incoming].slice(0, TIERS.limits.maxFiles);
+  state.files = [...state.files, ...incoming].slice(0, getEntitlementState().maxFiles);
   const oversized = state.files.find((f) => f.size > PRODUCT.maxPixels * 4);
   $("#file-summary").hidden = false;
   $("#file-summary").innerHTML =
-    `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Nothing leaves this browser."}</span>`;
+    `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Nothing leaves this browser."} · ${getEntitlementState().label}</span>`;
   $("#controls").hidden = false;
   renderControls();
 }
@@ -387,9 +392,14 @@ async function run() {
   }
   if (
     !state.files.length ||
-    !canUseTool(state.tool, { fileCount: state.files.length })
-  )
+    !canUseTool(state.tool, {
+      fileCount: state.files.length,
+      task: true,
+    })
+  ) {
+    $("#run-status").textContent = limitMessage();
     return;
+  }
   const button = $("#run-button");
   state.running = true;
   state.cancel = false;
@@ -448,6 +458,7 @@ async function run() {
     Array.from({ length: Math.min(PRODUCT.concurrency, tasks.length) }, worker),
   );
   state.results = outputs;
+  recordTask();
   renderResults();
   state.running = false;
   button.textContent = "Process images";

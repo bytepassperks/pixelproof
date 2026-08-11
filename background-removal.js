@@ -1,11 +1,10 @@
-import { canUseTool } from "./entitlements.js";
+import { canUseTool, limitMessage, recordTask } from "./entitlements.js";
 
 const MODEL_CACHE = "pixelproof-model-cache-v1";
+const MODEL_MIRROR = "https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev";
 const MODEL_CONFIG = Object.freeze({
-  encoderUrl:
-    "https://raw.githubusercontent.com/yformer/EfficientSAM/d525f622e6f640acf5a0fc37c7ca1f243da5bde0/weights/efficient_sam_vitt_encoder.onnx",
-  decoderUrl:
-    "https://raw.githubusercontent.com/yformer/EfficientSAM/d525f622e6f640acf5a0fc37c7ca1f243da5bde0/weights/efficient_sam_vitt_decoder.onnx",
+  encoderUrl: `${MODEL_MIRROR}/efficient-sam-vitt-encoder.onnx`,
+  decoderUrl: `${MODEL_MIRROR}/efficient-sam-vitt-decoder.onnx`,
   matteUrl:
     "https://huggingface.co/Xenova/vitmatte-small-composition-1k/resolve/6bc1297f6140f055a227b6d2cfe8c093281f35d2/onnx/model.onnx",
 });
@@ -112,7 +111,10 @@ export async function runBackground({ files, status, preview, controls }) {
     status.classList.add("error");
     return;
   }
-  if (!canUseTool("background-removal", { fileCount: 1 })) return;
+  if (!canUseTool("background-removal", { fileCount: 1, task: true })) {
+    status.textContent = limitMessage();
+    return;
+  }
   const file = files[0];
   const clicks = current.clicks;
   if (!clicks.length) {
@@ -174,6 +176,7 @@ export async function runBackground({ files, status, preview, controls }) {
   controls.run.disabled = false;
   if (!result) return;
   current.result = result;
+  recordTask();
   renderPreview(preview, result, controls.background.value);
   status.classList.add("success");
   status.textContent = `Ready · ${result.trimapStats.unknownPercent.toFixed(1)}% unknown band · ${formatBytes(result.buffer.byteLength)}`;
