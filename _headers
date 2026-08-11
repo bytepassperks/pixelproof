@@ -3,7 +3,7 @@
   Cross-Origin-Embedder-Policy: credentialless
   Referrer-Policy: strict-origin-when-cross-origin
   X-Content-Type-Options: nosniff
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' blob: https://pixelproof-license.getlaunchpod.workers.dev https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev https://huggingface.co https://cdn.jsdelivr.net https://us.aws.cdn.hf.co; worker-src 'self' blob:; child-src 'self' blob:; frame-src https://*.dodopayments.com; form-action 'self' https://*.dodopayments.com; manifest-src 'self'; media-src 'self' blob:
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' blob: https://pixelproof-license.getlaunchpod.workers.dev https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev; worker-src 'self' blob:; child-src 'self' blob:; frame-src https://*.dodopayments.com; form-action 'self' https://*.dodopayments.com; manifest-src 'self'; media-src 'self' blob:
 
 /robots.txt
   Content-Type: text/plain; charset=utf-8

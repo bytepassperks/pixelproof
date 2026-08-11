@@ -2,14 +2,11 @@ const SIZE = 1024;
 const MODEL_MIRROR =
   "https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev";
 const ORT_URL =
-  "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.mjs";
-const TRANSFORMERS_URL =
-  "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
-const MATTE_MODEL = "Xenova/vitmatte-small-composition-1k";
-const MATTE_REVISION = "6bc1297f6140f055a227b6d2cfe8c093281f35d2";
+  "./vendor/onnxruntime/ort.min.mjs";
 const MATTE_MODEL_URL = `${MODEL_MIRROR}/vitmatte-small-composition-1k.onnx`;
 const MATTE_MODEL_SHA256 =
   "bf28d2e0be2c073286e88d60ad649d7123da2749a2d99133fd1098d5887e0225";
+const MODEL_CACHE = "pixelproof-model-cache-v1";
 const models = {};
 let integrityFetchInstalled = false;
 
@@ -24,12 +21,8 @@ function installIntegrityFetch() {
   const originalFetch = self.fetch.bind(self);
   self.fetch = async (input, init) => {
     const requestUrl = typeof input === "string" ? input : input.url;
-    const modelRequest = requestUrl.includes("/onnx/model.onnx") ||
-      requestUrl.endsWith("/model.onnx");
-    const response = await originalFetch(
-      modelRequest ? MATTE_MODEL_URL : input,
-      init,
-    );
+    const response = await originalFetch(input, init);
+    const modelRequest = requestUrl === MATTE_MODEL_URL;
     if (!modelRequest) return response;
     const bytes = await response.clone().arrayBuffer();
     const actual = await hexDigest(bytes);
@@ -38,6 +31,22 @@ function installIntegrityFetch() {
     return response;
   };
   integrityFetchInstalled = true;
+}
+
+async function loadVerifiedMatteModel() {
+  const cache = await caches.open(MODEL_CACHE);
+  let response = await cache.match(MATTE_MODEL_URL);
+  if (!response) {
+    response = await fetch(MATTE_MODEL_URL);
+    if (!response.ok)
+      throw new Error(`ViTMatte model request failed: ${response.status}`);
+    await cache.put(MATTE_MODEL_URL, response.clone());
+  }
+  const bytes = await response.arrayBuffer();
+  const actual = await hexDigest(bytes);
+  if (actual !== MATTE_MODEL_SHA256)
+    throw new Error("ViTMatte model integrity check failed. The model was not used.");
+  return bytes;
 }
 
 function integral(binary) {
@@ -107,7 +116,7 @@ async function loadModels(config, progress) {
     progress("Loading browser inference runtime…");
     models.ort = await import(ORT_URL);
     models.ort.env.wasm.wasmPaths =
-      "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+      new URL("./vendor/onnxruntime/", self.location.href).href;
     // Keep the worker path on the non-threaded WASM backend. Threaded
     // ORT creates a blob worker at runtime, which strict CSP blocks.
     models.ort.env.wasm.numThreads = 1;
@@ -136,25 +145,11 @@ async function loadModels(config, progress) {
   }
   if (!models.matte) {
     progress("Loading alpha-matting model…");
-    const transformers = await import(TRANSFORMERS_URL);
-    transformers.env.useBrowserCache = true;
-    transformers.env.allowRemoteModels = true;
-    transformers.env.backends.onnx.wasm.numThreads = 1;
-    transformers.env.backends.onnx.wasm.proxy = false;
-    models.processor = await transformers.AutoProcessor.from_pretrained(
-      MATTE_MODEL,
-      {
-        revision: MATTE_REVISION,
-      },
-    );
-    models.matte = await transformers.VitMatteForImageMatting.from_pretrained(
-      MATTE_MODEL,
-      {
-        revision: MATTE_REVISION,
-        device: "wasm",
-        dtype: "fp32",
-      },
-    );
+    const bytes = await loadVerifiedMatteModel();
+    models.matte = await models.ort.InferenceSession.create(bytes, {
+      executionProviders: ["wasm"],
+      graphOptimizationLevel: "all",
+    });
   }
 }
 
@@ -344,25 +339,40 @@ function decontaminate(rgba, alpha, width, height) {
 }
 
 async function runMatte(image, trimapPixels, progress) {
-  const { RawImage } = await import(TRANSFORMERS_URL);
-  const rawImage = await RawImage.fromBlob(await imageToBlob(image));
-  const trimapCanvas = new OffscreenCanvas(image.width, image.height);
-  trimapCanvas
-    .getContext("2d")
-    .putImageData(new ImageData(trimapPixels, image.width, image.height), 0, 0);
-  const trimap = await RawImage.fromBlob(
-    await trimapCanvas.convertToBlob({ type: "image/png" }),
-  );
-  const prepared = await models.processor(rawImage, trimap);
+  const { pixels } = await encodeImageAtSource(image);
+  const width = image.width;
+  const height = image.height;
+  const paddedWidth = Math.ceil(width / 32) * 32;
+  const paddedHeight = Math.ceil(height / 32) * 32;
+  const plane = paddedWidth * paddedHeight;
+  const values = new Float32Array(plane * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const source = (y * width + x) * 4;
+      const target = y * paddedWidth + x;
+      values[target] = (pixels[source] / 255 - 0.5) / 0.5;
+      values[plane + target] = (pixels[source + 1] / 255 - 0.5) / 0.5;
+      values[plane * 2 + target] = (pixels[source + 2] / 255 - 0.5) / 0.5;
+      values[plane * 3 + target] = trimapPixels[source] / 255;
+    }
+  }
   progress("Refining edges into continuous alpha…");
-  const output = await models.matte(prepared);
-  return output.alphas.data;
-}
-
-async function imageToBlob(image) {
-  const canvas = new OffscreenCanvas(image.width, image.height);
-  canvas.getContext("2d").drawImage(image, 0, 0);
-  return canvas.convertToBlob({ type: "image/png" });
+  const output = await models.matte.run({
+    pixel_values: new models.ort.Tensor(
+      "float32",
+      values,
+      [1, 4, paddedHeight, paddedWidth],
+    ),
+  });
+  const alpha = output.alphas || output[models.matte.outputNames[0]];
+  const result = new Float32Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    result.set(
+      alpha.data.subarray(y * paddedWidth, y * paddedWidth + width),
+      y * width,
+    );
+  }
+  return result;
 }
 
 async function run(data) {

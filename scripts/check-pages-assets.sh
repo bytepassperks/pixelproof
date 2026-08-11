@@ -41,6 +41,11 @@ assets=(
   vendor/heic/libheif.js
   vendor/heic/libheif.wasm
   vendor/pdf-lib/pdf-lib.min.js
+  vendor/onnxruntime/ort.min.mjs
+  vendor/onnxruntime/ort-wasm-simd-threaded.jsep.mjs
+  vendor/onnxruntime/ort-wasm-simd-threaded.jsep.wasm
+  vendor/onnxruntime/ort-wasm-simd-threaded.mjs
+  vendor/onnxruntime/ort-wasm-simd-threaded.wasm
   pdf.js
   pdf-worker.js
 )

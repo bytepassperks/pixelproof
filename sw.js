@@ -1,4 +1,4 @@
-const CACHE = "pixelproof-shell-20260811-14";
+const CACHE = "pixelproof-shell-20260811-15";
 const SHELL = [
   "./",
   "./index.html",
@@ -10,6 +10,11 @@ const SHELL = [
   "./activation.js",
   "./background-removal.js",
   "./background-worker.js",
+  "./vendor/onnxruntime/ort.min.mjs",
+  "./vendor/onnxruntime/ort-wasm-simd-threaded.jsep.mjs",
+  "./vendor/onnxruntime/ort-wasm-simd-threaded.jsep.wasm",
+  "./vendor/onnxruntime/ort-wasm-simd-threaded.mjs",
+  "./vendor/onnxruntime/ort-wasm-simd-threaded.wasm",
   "./config.js",
   "./entitlements.js",
   "./privacy.js",

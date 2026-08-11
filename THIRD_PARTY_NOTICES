@@ -27,9 +27,11 @@ EfficientSAM weights. A mismatch fails closed. The ViTMatte runtime fetch is
 revision-pinned and its ONNX weight hash is recorded above; Transformers.js
 also fetches model configuration/tokenizer assets required by its model loader.
 
-ONNX Runtime Web and Transformers.js are loaded at runtime from pinned
-jsDelivr package versions. Their respective licenses and notices remain
-available from their upstream package repositories.
+ONNX Runtime Web 1.20.1 is vendored under `vendor/onnxruntime/` and served
+same-origin without modification. It is licensed under the MIT License; see
+`vendor/onnxruntime/LICENSE`. The vendored runtime files were taken from the
+1.20.1 npm package. ViTMatte is run directly through this vendored ONNX
+Runtime session; no general-purpose model framework is required at runtime.
 
 
 ===== libheif-js 1.19.8 / libheif 1.19.8 LGPL-3.0 =====

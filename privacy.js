@@ -18,9 +18,6 @@ const ALLOWED_HOSTS = new Set([
   location.host,
   new URL(PRODUCT.workerUrl).host,
   new URL(PRODUCT.modelMirrorUrl).host,
-  "huggingface.co",
-  "cdn.jsdelivr.net",
-  "us.aws.cdn.hf.co",
 ]);
 
 function bytesToHex(bytes) {
