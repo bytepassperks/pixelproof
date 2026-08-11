@@ -53,7 +53,17 @@ Live endpoints:
 ## Static deployment
 
 ```bash
-npx wrangler pages deploy <static-directory> --project-name pixelproof --branch main
+./scripts/deploy-pages.sh
+```
+
+The script deploys the repository root and then runs
+`scripts/check-pages-assets.sh` against the live Pages URL. The post-deploy
+check fails if any expected HTML, JavaScript, CSS, or Worker asset is missing,
+redirects to HTML unexpectedly, or is served with the wrong content type.
+Override the destination when needed:
+
+```bash
+./scripts/deploy-pages.sh https://pixelproof.pages.dev
 ```
 
 The `_headers` file is required in the deployed static directory:

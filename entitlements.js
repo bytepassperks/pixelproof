@@ -66,10 +66,16 @@ export function canUseTool(toolId, context = {}) {
   return true;
 }
 
-export function limitMessage() {
+export function limitMessage(toolId = '', context = {}) {
   const state = getEntitlementState();
+  if (toolId === 'background-removal' && !state.backgroundRemoval) {
+    return 'Background removal is included with Solo and Studio. Upgrade to unlock it.';
+  }
+  if (context.fileCount && context.fileCount > state.maxFiles) {
+    return `${state.label} tier: batches up to ${state.maxFiles} files.`;
+  }
   if (state.tasksPerDay !== Infinity && state.tasksUsed >= state.tasksPerDay) return `Free tier: ${state.tasksPerDay} tasks per day.`;
-  return `Free tier: batches up to ${state.maxFiles} files.`;
+  return `${state.label} tier: batches up to ${state.maxFiles} files.`;
 }
 
 export const LICENSE_STORAGE_KEY = LICENSE_KEY;

@@ -112,7 +112,10 @@ export async function runBackground({ files, status, preview, controls }) {
     return;
   }
   if (!canUseTool("background-removal", { fileCount: 1, task: true })) {
-    status.textContent = limitMessage();
+    status.textContent = limitMessage("background-removal", {
+      fileCount: 1,
+      task: true,
+    });
     return;
   }
   const file = files[0];

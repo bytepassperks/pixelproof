@@ -397,7 +397,10 @@ async function run() {
       task: true,
     })
   ) {
-    $("#run-status").textContent = limitMessage();
+    $("#run-status").textContent = limitMessage(state.tool, {
+      fileCount: state.files.length,
+      task: true,
+    });
     return;
   }
   const button = $("#run-button");
