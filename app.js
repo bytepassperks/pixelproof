@@ -488,7 +488,7 @@ async function updateMetadata() {
   const metadata = await inspectMetadata(file);
   const fields = Object.entries(metadata.fields).filter(([key]) => !["gpsOffset", "gpsCoordinates", "gps"].includes(key));
   const coordinates = metadata.gpsCoordinates ? `<p class="metadata-warning">GPS coordinates: ${metadata.gpsCoordinates.latitude}, ${metadata.gpsCoordinates.longitude}. Strip metadata before sharing if that is not intentional.</p>` : (metadata.gps ? '<p class="metadata-warning">GPS data is present but its coordinates could not be decoded.</p>' : '<p>No GPS coordinates were found in the readable EXIF block.</p>');
-  output.innerHTML = `<p><strong>${metadata.fieldCount ? `${metadata.fieldCount} metadata field${metadata.fieldCount === 1 ? "" : "s"} found` : "No readable EXIF fields found"}</strong> · ${Math.round(metadata.bytes / 1024)} KB · ${metadata.format}</p>${coordinates}<dl>${fields.map(([key, value]) => `<dt>${key}</dt><dd>${String(value)}</dd>`).join("")}</dl>`;
+  output.innerHTML = `<p><strong>${metadata.fieldCount ? `${metadata.fieldCount} metadata field${metadata.fieldCount === 1 ? "" : "s"} found` : "No readable EXIF fields found"}</strong> · ${Math.round(metadata.bytes / 1024)} KB · ${escapeHtml(metadata.format)}</p>${coordinates}<dl>${fields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
 }
 function editorOperation() {
   return {
@@ -732,6 +732,21 @@ function stem(name) {
       .replace(/^-|-$/g, "") || "image"
   );
 }
+function friendlyError(error) {
+  const message = String(error?.message || error || "Unknown image-processing error.");
+  if (/could not be decoded|decode|invalidstateerror/i.test(message))
+    return "This file could not be decoded as a supported image. Check that it is a real JPEG, PNG, WebP, or HEIC/HEIF file.";
+  return message;
+}
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[character]));
+}
 async function processOne(file, op) {
   let input = file;
   if (isHeic(file)) {
@@ -850,7 +865,7 @@ async function run() {
       } catch (error) {
         outputs.push({
           name: task.name,
-          error: error.message,
+          error: friendlyError(error),
           source: task.file.name,
         });
       }
@@ -869,9 +884,13 @@ async function run() {
   if (state.tool === "compare") renderCompare(outputs[0]);
   state.running = false;
   button.textContent = "Process images";
+  const failed = outputs.filter((result) => result.error).length;
+  const succeeded = outputs.length - failed;
   $("#run-status").textContent = state.cancel
     ? `Cancelled after ${done} output${done === 1 ? "" : "s"}.`
-    : `Finished ${done} output${done === 1 ? "" : "s"}.`;
+    : failed
+      ? `Finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. See the output rows for next steps.`
+      : `Finished ${done} output${done === 1 ? "" : "s"}.`;
   state.cancel = false;
 }
 function outputName(task, result) {
@@ -911,9 +930,9 @@ function renderResults() {
       state.urls.push(url);
       const quality = r.quality ? ` · quality ${Math.round(r.quality * 100)}%` : "";
       const budget = r.resizedForBudget ? " · dimensions reduced to hit budget" : "";
-      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${r.name}</div><div class="result-meta">${r.mime} · ${Math.round(r.bytes.byteLength / 1024)} KB · ${r.width}×${r.height}${quality}${budget}</div></div><a class="btn" href="${url}" download="${r.name}">Download</a>`;
+      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${escapeHtml(r.name)}</div><div class="result-meta">${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB · ${r.width}×${r.height}${quality}${budget}</div></div><a class="btn" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
     } else
-      row.innerHTML = `<div></div><div><div class="result-name">${r.source}</div><div class="error">${r.error}</div></div>`;
+      row.innerHTML = `<div></div><div><div class="result-name">${escapeHtml(r.source)}</div><div class="error">${escapeHtml(r.error)}</div></div>`;
     list.append(row);
   }
   if (good.length) {
