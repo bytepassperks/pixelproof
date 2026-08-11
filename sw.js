@@ -36,6 +36,12 @@ const SHELL = [
   "./vendor/heic/libheif.js",
   "./vendor/heic/libheif.wasm",
   "./vendor/pdf-lib/pdf-lib.min.js",
+  "./vendor/avif/encode.js",
+  "./vendor/avif/meta.js",
+  "./vendor/avif/utils.js",
+  "./vendor/avif/codec/pre.js",
+  "./vendor/avif/codec/enc/avif_enc.js",
+  "./vendor/avif/codec/enc/avif_enc.wasm",
 ];
 
 self.addEventListener("install", (event) => {

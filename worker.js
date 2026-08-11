@@ -34,6 +34,149 @@ async function encodeWithMetadata(canvas, mime, quality, metadata) {
   }
   return result;
 }
+let avifEncoder;
+async function encodeAvif(canvas, quality) {
+  avifEncoder ||= (await import("./vendor/avif/encode.js")).default;
+  const image = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+  const bytes = await avifEncoder(image, {
+    quality: Math.round((quality ?? 0.82) * 100),
+    qualityAlpha: Math.round((quality ?? 0.82) * 100),
+    speed: 6,
+    subsample: 1,
+  });
+  return {bytes, mime: "image/avif", width: canvas.width, height: canvas.height};
+}
+async function encodeOutput(canvas, mime, quality, metadata, operation = {}) {
+  if (mime === "image/avif") return encodeAvif(canvas, quality);
+  if (mime === "image/png" && operation.pngPalette) return encodePalettePng(canvas);
+  return encodeWithMetadata(canvas, mime, quality, metadata);
+}
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1)
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function pngChunk(type, data) {
+  const name = new TextEncoder().encode(type);
+  const chunk = new Uint8Array(12 + data.length);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, data.length);
+  chunk.set(name, 4);
+  chunk.set(data, 8);
+  view.setUint32(8 + data.length, crc32(chunk.subarray(4, 8 + data.length)));
+  return chunk;
+}
+async function deflate(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+function paletteFor(data, maxColors = 256) {
+  const counts = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    const key = (data[i] << 24) | (data[i + 1] << 16) | (data[i + 2] << 8) | data[i + 3];
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const colors = [...counts].map(([key, count]) => ({
+    r: (key >>> 24) & 255, g: (key >>> 16) & 255, b: (key >>> 8) & 255, a: key & 255, count,
+  }));
+  if (colors.length <= maxColors) return colors;
+  let boxes = [colors];
+  while (boxes.length < maxColors) {
+    boxes.sort((a, b) => {
+      const range = (items) => Math.max(
+        ...["r", "g", "b", "a"].map((channel) =>
+          Math.max(...items.map((item) => item[channel])) -
+          Math.min(...items.map((item) => item[channel]))),
+      );
+      return range(b) * b.reduce((sum, item) => sum + item.count, 0) -
+        range(a) * a.reduce((sum, item) => sum + item.count, 0);
+    });
+    const box = boxes.shift();
+    if (!box || box.length < 2) { if (box) boxes.push(box); break; }
+    const channel = ["r", "g", "b", "a"].sort((x, y) =>
+      (Math.max(...box.map((item) => item[y])) - Math.min(...box.map((item) => item[y]))) -
+      (Math.max(...box.map((item) => item[x])) - Math.min(...box.map((item) => item[x]))),
+    ).pop();
+    box.sort((a, b) => a[channel] - b[channel]);
+    const total = box.reduce((sum, item) => sum + item.count, 0);
+    let midpoint = 0;
+    for (let i = 0, sum = 0; i < box.length; i += 1) {
+      sum += box[i].count;
+      if (sum >= total / 2) { midpoint = Math.max(1, i + 1); break; }
+    }
+    boxes.push(box.slice(0, midpoint), box.slice(midpoint));
+  }
+  return boxes.map((box) => {
+    const total = box.reduce((sum, item) => sum + item.count, 0);
+    return ["r", "g", "b", "a"].reduce((color, channel) => {
+      color[channel] = Math.round(box.reduce((sum, item) => sum + item[channel] * item.count, 0) / total);
+      return color;
+    }, {count: total});
+  });
+}
+async function encodePalettePng(canvas) {
+  const {data, width, height} = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+  const palette = paletteFor(data);
+  const indices = new Uint8Array(width * height);
+  const working = palette.length === 256 ? Float32Array.from(data) : data;
+  for (let i = 0; i < indices.length; i += 1) {
+    let best = 0, distance = Infinity;
+    for (let p = 0; p < palette.length; p += 1) {
+      const color = palette[p];
+      const dr = working[i * 4] - color.r, dg = working[i * 4 + 1] - color.g;
+      const db = working[i * 4 + 2] - color.b, da = working[i * 4 + 3] - color.a;
+      const value = dr * dr + dg * dg + db * db + da * da;
+      if (value < distance) { distance = value; best = p; }
+    }
+    indices[i] = best;
+    if (palette.length === 256) {
+      const color = palette[best];
+      const errors = [
+        working[i * 4] - color.r,
+        working[i * 4 + 1] - color.g,
+        working[i * 4 + 2] - color.b,
+      ];
+      const diffuse = (pixel, weight) => {
+        if (pixel < 0 || pixel >= indices.length) return;
+        for (let channel = 0; channel < 3; channel += 1)
+          working[pixel * 4 + channel] += errors[channel] * weight;
+      };
+      const x = i % width;
+      if (x + 1 < width) diffuse(i + 1, 7 / 16);
+      if (i + width < indices.length) {
+        diffuse(i + width, 5 / 16);
+        if (x > 0) diffuse(i + width - 1, 3 / 16);
+        if (x + 1 < width) diffuse(i + width + 1, 1 / 16);
+      }
+    }
+  }
+  const scanlines = new Uint8Array((width + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    scanlines[y * (width + 1)] = 0;
+    scanlines.set(indices.subarray(y * width, (y + 1) * width), y * (width + 1) + 1);
+  }
+  const ihdr = new Uint8Array(13);
+  const header = new DataView(ihdr.buffer);
+  header.setUint32(0, width); header.setUint32(4, height);
+  ihdr[8] = 8; ihdr[9] = 3;
+  const plte = new Uint8Array(palette.length * 3);
+  const alpha = new Uint8Array(palette.length);
+  palette.forEach((color, index) => {
+    plte[index * 3] = color.r; plte[index * 3 + 1] = color.g; plte[index * 3 + 2] = color.b;
+    alpha[index] = color.a;
+  });
+  const compressed = await deflate(scanlines);
+  const chunks = [pngChunk("IHDR", ihdr), pngChunk("PLTE", plte), pngChunk("tRNS", alpha), pngChunk("IDAT", compressed), pngChunk("IEND", new Uint8Array())];
+  const output = new Uint8Array(8 + chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+  output.set([137, 80, 78, 71, 13, 10, 26, 10]);
+  let offset = 8;
+  for (const chunk of chunks) { output.set(chunk, offset); offset += chunk.length; }
+  return {bytes: output.buffer, mime: "image/png", width, height};
+}
 function optimizeFlatPng(canvas) {
   const context = canvas.getContext("2d");
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -241,7 +384,7 @@ self.onmessage = async ({data}) => {
       let low = 0.05, high = 1, best = null;
       for (let attempt = 0; attempt < 12; attempt++) {
         const quality = (low + high) / 2;
-        const candidate = await encodeWithMetadata(canvas, operation.mime, quality, operation.metadata);
+              const candidate = await encodeOutput(canvas, operation.mime, quality, operation.metadata, operation);
         candidate.quality = quality;
         if (candidate.bytes.byteLength <= budget) {
           best = candidate;
@@ -263,7 +406,7 @@ self.onmessage = async ({data}) => {
             low = 0.05; high = 1;
             for (let attempt = 0; attempt < 12; attempt++) {
               const quality = (low + high) / 2;
-              const candidate = await encodeWithMetadata(resized, operation.mime, quality, operation.metadata);
+              const candidate = await encodeOutput(resized, operation.mime, quality, operation.metadata, operation);
               candidate.quality = quality;
               if (candidate.bytes.byteLength <= budget) {
                 best = candidate;
@@ -278,7 +421,7 @@ self.onmessage = async ({data}) => {
       }
       result = best;
     } else {
-      result = await encodeWithMetadata(canvas, operation.mime || file.type || 'image/png', operation.quality, operation.metadata);
+      result = await encodeOutput(canvas, operation.mime || file.type || 'image/png', operation.quality, operation.metadata, operation);
       if (operation.mime === "image/png" && operation.pngOptimize) {
         const context = canvas.getContext("2d");
         const original = context.getImageData(0, 0, canvas.width, canvas.height);

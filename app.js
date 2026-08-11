@@ -724,7 +724,7 @@ function renderControls() {
   }
   let html = "";
   if (id === "compress")
-    html = `<p class="hint">Format defaults to PNG for transparency and flat-colour art, JPEG for photographs. You can override it. PNG uses conservative palette optimisation when the source has few colours.</p><div class="form-grid">${field("Output format", `<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option><option value="image/png">PNG</option></select>`)}${field("Quality", `<input id="quality" type="range" min="10" max="100" value="82"><output id="quality-output">82</output>`)}${field("Strip metadata", '<label class="check"><input id="strip" type="checkbox" checked> Remove EXIF and metadata</label>')}<div class="field"><label>Live output estimate</label><output id="size-estimate" class="mono">Choose an image to estimate</output></div></div>`;
+    html = `<p class="hint">Format defaults to PNG for transparency and flat-colour art, JPEG for photographs. You can override it. PNG is lossless by default; choose palette mode only when a smaller, slightly lossy result is acceptable.</p><div class="form-grid">${field("Output format", `<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option><option value="image/png">PNG</option><option value="image/avif">AVIF</option></select>`)}${field("Quality", `<input id="quality" type="range" min="10" max="100" value="82"><output id="quality-output">82</output>`)}${field("PNG mode", '<select id="pngMode"><option value="lossless">Lossless</option><option value="palette">Smaller palette (slightly lossy)</option></select>')}${field("Strip metadata", '<label class="check"><input id="strip" type="checkbox" checked> Remove EXIF and metadata</label>')}<div class="field"><label>Live output estimate</label><output id="size-estimate" class="mono">Choose an image to estimate</output></div></div>`;
   else if (id === "target-size")
     html = `<p class="hint">Each image gets its own quality search. If the target is unreachable at the current dimensions, the result explains why; optionally allow a dimension reduction.</p><div class="form-grid">${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}${field("Maximum bytes", '<input id="targetBytes" type="number" min="1024" step="1024" value="200000">')}${field("When unreachable", '<label class="check"><input id="reduceDimensions" type="checkbox"> Reduce dimensions to reach the budget</label>')}</div>`;
   else if (id === "resize")
@@ -734,7 +734,7 @@ function renderControls() {
   else if (id === "transform")
     html = `<div class="form-grid">${field("Rotation", '<select id="degrees"><option value="0">0°</option><option value="90">90° clockwise</option><option value="180">180°</option><option value="270">270° clockwise</option></select>')}${field("Flip", '<select id="flip"><option value="none">None</option><option value="x">Flip horizontal</option><option value="y">Flip vertical</option></select>')}</div>`;
   else if (id === "convert")
-    html = `<div class="form-grid">${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select>')}${field("Quality", '<input id="quality" type="range" min="10" max="100" value="88">')}</div>`;
+    html = `<div class="form-grid">${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option><option value="image/avif">AVIF</option></select>')}${field("Quality", '<input id="quality" type="range" min="10" max="100" value="88">')}</div>`;
   else if (id === "watermark")
     html = `<div class="form-grid">${field("Text watermark", '<input id="text" placeholder="© Your brand">', "field-wide")}${field("Image watermark", '<input id="mark" type="file" accept="image/png,image/jpeg,image/webp">')}${field("Position", '<select id="position"><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="center">Center</option><option value="top-right">Top right</option></select>')}${field("Opacity", '<input id="opacity" type="range" min="0.1" max="1" step="0.05" value="0.55">')}${field("Scale", '<input id="scale" type="range" min="0.05" max="0.6" step="0.01" value="0.2">')}</div>`;
   else if (id === "photo-editor")
@@ -1220,7 +1220,7 @@ async function options() {
     q = Number($("#quality")?.value || 88),
     format = $("#format")?.value || "image/png";
   if (id === "compress" || id === "convert")
-    return { type: id, mime: format, quality: q / 100, pngOptimize: format === "image/png" };
+    return { type: id, mime: format, quality: q / 100, pngOptimize: false, pngPalette: format === "image/png" && $("#pngMode")?.value === "palette" };
   if (id === "target-size") {
     return {type: id, mime: $("#format").value, targetBytes: Number($("#targetBytes").value), reduceDimensions: $("#reduceDimensions").checked, metadata: {mode: "strip"}};
   }
@@ -1802,6 +1802,7 @@ async function detectFormats() {
   const canvas = document.createElement("canvas");
   canvas.width = 1;
   canvas.height = 1;
+  supportedFormats.add("image/avif");
   for (const mime of Object.values(MIME).map((x) => x.mime)) {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime));
     if (blob?.type === mime) supportedFormats.add(mime);

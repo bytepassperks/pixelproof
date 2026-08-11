@@ -23,15 +23,30 @@ ViTMatte-S
     onnx/model.onnx bf28d2e0be2c073286e88d60ad649d7123da2749a2d99133fd1098d5887e0225
 
 The application verifies the SHA-256 values above before using the mirrored
-EfficientSAM weights. A mismatch fails closed. The ViTMatte runtime fetch is
-revision-pinned and its ONNX weight hash is recorded above; Transformers.js
-also fetches model configuration/tokenizer assets required by its model loader.
+EfficientSAM weights. A mismatch fails closed. The ViTMatte ONNX weight is
+loaded directly by ONNX Runtime and verified against the recorded hash before
+use.
 
 ONNX Runtime Web 1.20.1 is vendored under `vendor/onnxruntime/` and served
 same-origin without modification. It is licensed under the MIT License; see
 `vendor/onnxruntime/LICENSE`. The vendored runtime files were taken from the
 1.20.1 npm package. ViTMatte is run directly through this vendored ONNX
 Runtime session; no general-purpose model framework is required at runtime.
+
+===== @jsquash/avif 2.1.1 / libavif 1.0.1 / libaom 3.7.0 =====
+The AVIF encoder is vendored under `vendor/avif/` and loaded lazily only when
+the user chooses AVIF. The JavaScript package is Apache-2.0. Its encoder
+module is built from libavif v1.0.1, which is BSD-2-Clause, and includes the
+libaom AV1 encoder (AOMedia v3.7.0), which is BSD-2-Clause. The bundled
+encoder also carries the Alliance for Open Media Patent License 1.0 notice;
+the patent license grants a royalty-free license for Necessary Claims subject
+to its defensive-termination and notice conditions. No dav1d or rav1e codec
+is bundled. The package and codec carry no bundled image data files.
+
+===== @jsquash/oxipng 2.3.0 / oxipng =====
+The project evaluated `@jsquash/oxipng` 2.3.0. Its JavaScript package is
+Apache-2.0 and its bundled oxipng codec is MIT. It was not required for the
+palette encoder shipped here; no oxipng binary is included.
 
 
 ===== libheif-js 1.19.8 / libheif 1.19.8 LGPL-3.0 =====
