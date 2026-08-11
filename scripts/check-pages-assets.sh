@@ -29,6 +29,9 @@ assets=(
   THIRD_PARTY_NOTICES
   vendor/heic/libheif.js
   vendor/heic/libheif.wasm
+  vendor/pdf-lib/pdf-lib.min.js
+  pdf.js
+  pdf-worker.js
 )
 
 for asset in "${assets[@]}"; do

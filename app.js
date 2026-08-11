@@ -1,4 +1,4 @@
-import { PRODUCT, MIME } from "./config.js";
+import { PRODUCT, MIME, PLATFORM_PROFILES } from "./config.js";
 import { registerTool, listTools } from "./registry.js";
 import { downloadZip } from "./zip.js";
 import {
@@ -10,6 +10,7 @@ import {
 import { mountBackgroundTool } from "./background-removal.js";
 import { inspectMetadata } from "./metadata.js";
 import { decodeHeic, isHeic } from "./heic.js";
+import { generatePdf, imageForPdf, pdfPageSize } from "./pdf.js";
 
 const toolDefs = [
   {
@@ -142,6 +143,34 @@ const toolDefs = [
     title: "See what the file reveals.",
     description: "Inspect camera, timestamps, software, and GPS presence before stripping or preserving selected tags.",
   },
+  {
+    id: "image-to-pdf",
+    label: "Image to PDF",
+    kicker: "WORKFLOW / PDF",
+    title: "Build the document.",
+    description: "Reorder images, choose physical page settings, and export one compact local PDF or one PDF per image.",
+  },
+  {
+    id: "platform-profiles",
+    label: "Platform profiles",
+    kicker: "WORKFLOW / PUBLISHED GUIDANCE",
+    title: "Start from the destination.",
+    description: "Editable starting points based on published platform guidance, never a compliance guarantee.",
+  },
+  {
+    id: "id-print-sheet",
+    label: "ID print sheet",
+    kicker: "WORKFLOW / DIMENSIONS ONLY",
+    title: "Lay out the photos.",
+    description: "Create correctly sized 4×6 or A4 print sheets. PixelProof does not check eligibility requirements.",
+  },
+  {
+    id: "svg-raster",
+    label: "SVG rasterise",
+    kicker: "FORMAT / SVG",
+    title: "Rasterise SVG safely.",
+    description: "Remove active content and external references, then choose the output pixel dimensions.",
+  },
 ];
 toolDefs.forEach(registerTool);
 const $ = (s) => document.querySelector(s);
@@ -156,6 +185,8 @@ const state = {
   faceScale: {x: 1, y: 1},
   recipe: null,
   retryFiles: [],
+  pdfOrder: [],
+  animationFiles: [],
 };
 const supportedFormats = new Set();
 const originalStats = new WeakMap();
@@ -391,6 +422,7 @@ $("#run-button").onclick = () =>
 function selectTool(id) {
   state.tool = id;
   state.results = [];
+  $("#run-status").textContent = "";
   $("#results").hidden = true;
   document
     .querySelectorAll(".tool-link")
@@ -403,16 +435,51 @@ function selectTool(id) {
 }
 function addFiles(list) {
   const incoming = [...list].filter((f) =>
-    /^image\/(jpeg|png|webp)$/.test(f.type) || isHeic(f),
+    /^image\/(jpeg|png|webp|bmp|gif|svg\+xml|apng)$/.test(f.type) ||
+    /^(image\/(x-icon|vnd\.microsoft\.icon))$/.test(f.type) ||
+    /\.(heic|heif|bmp|gif|ico|cur|svg|apng)$/i.test(f.name) || isHeic(f),
   );
   if (!incoming.length) return;
   state.files = [...state.files, ...incoming];
+  state.pdfOrder = state.files;
+  inspectAnimations(incoming).then((found) => {
+    state.animationFiles = [...new Set([...state.animationFiles, ...found])];
+    renderAnimationWarning();
+  });
   const oversized = state.files.find((f) => f.size > PRODUCT.maxPixels * 4);
   $("#file-summary").hidden = false;
   $("#file-summary").innerHTML =
-    `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Nothing leaves this browser."} · ${getEntitlementState().label}</span>`;
+    `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Nothing leaves this browser."} · ${getEntitlementState().label}</span><div id="animation-warning"></div>`;
   $("#controls").hidden = false;
   renderControls();
+}
+async function inspectAnimations(files) {
+  const found = [];
+  for (const file of files) {
+    const bytes = new Uint8Array(await file.slice(0, Math.min(file.size, 2_000_000)).arrayBuffer());
+    const name = file.name;
+    const gif = bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && countGifFrames(bytes) > 1;
+    const apng = bytes.includes(0x61) && bytes.includes(0x63) && bytes.includes(0x54) && bytes.includes(0x4c) && hasChunk(bytes, "acTL");
+    const webp = hasChunk(bytes, "ANIM");
+    if (gif || apng || webp) found.push(name);
+  }
+  return found;
+}
+function hasChunk(bytes, text) {
+  const needle = [...text].map((character) => character.charCodeAt(0));
+  for (let index = 0; index <= bytes.length - needle.length; index++)
+    if (needle.every((value, offset) => bytes[index + offset] === value)) return true;
+  return false;
+}
+function countGifFrames(bytes) {
+  let frames = 0;
+  for (let index = 0; index < bytes.length - 1; index++) if (bytes[index] === 0x2c) frames++;
+  return frames;
+}
+function renderAnimationWarning() {
+  const output = $("#animation-warning");
+  if (!output || !state.animationFiles.length) return;
+  output.innerHTML = `<div class="warning-callout"><strong>Animated input detected:</strong> ${state.animationFiles.map(escapeHtml).join(", ")}. Only the first frame will be processed; animation will not be preserved. <label class="check"><input id="allow-animation" type="checkbox"> I understand</label></div>`;
 }
 function savedSettings() {
   try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"); } catch { return {}; }
@@ -494,6 +561,15 @@ function renderControls() {
     html = `<div class="form-grid">${field("Format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}${field("Quality", '<input id="quality" type="range" min="10" max="100" value="75">')}</div><div id="compare-output" class="compare-output">Run a comparison to inspect the result.</div>`;
   else if (id === "metadata")
     html = `<p class="hint">Metadata is read directly from the selected file bytes. GPS is called out separately because location data can be sensitive.</p><div id="metadata-output" class="metadata-output">Choose an image to inspect.</div><div class="form-grid">${field("Export mode", '<select id="metadataMode"><option value="strip">Strip all metadata</option><option value="preserve">Keep copyright and orientation</option></select>')}</div>`;
+  else if (id === "image-to-pdf")
+    html = `<p class="hint">PDFs embed re-encoded JPEG pages at a size-conscious quality. Drag pages below to change their order. A combined PDF or one PDF per image can be exported.</p><div id="pdf-pages" class="pdf-pages"></div><div class="form-grid">${field("Page size", '<select id="pdfSize"><option value="a4">A4</option><option value="letter">US Letter</option><option value="match">Match image</option></select>')}${field("Orientation", '<select id="pdfOrientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>')}${field("Image framing", '<select id="pdfMode"><option value="fit">Fit — no crop</option><option value="fill">Fill — crop edges</option></select>')}${field("Margins (mm)", '<input id="pdfMargin" type="number" min="0" max="50" step="1" value="10">')}${field("Output", '<select id="pdfOutput"><option value="combined">One combined PDF</option><option value="single">One PDF per image</option></select>')}</div><p id="pdf-status" class="hint"></p>`;
+  else if (id === "platform-profiles") {
+    const profiles = [...PLATFORM_PROFILES, ...JSON.parse(localStorage.getItem("pixelproof-platform-profiles") || "[]")];
+    html = `<p class="hint">These are starting points based on published guidance. They are editable, date-stamped references—not platform approval or a compliance guarantee.</p><div class="form-grid">${field("Profile", `<select id="platformProfile">${profiles.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>`).join("")}</select>`)}${field("Width (px)", '<input id="platformWidth" type="number" min="1" value="1200">')}${field("Height (px)", '<input id="platformHeight" type="number" min="1" value="800">')}${field("Framing", '<select id="platformMode"><option value="fit">Fit — no crop</option><option value="fill">Fill — crop edges</option></select>')}${field("Output", '<select id="platformMime"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select>')}</div><div id="platform-source" class="profile-source"></div><button class="text-button" id="save-platform-profile">Save as editable profile</button>`;
+  } else if (id === "id-print-sheet")
+    html = `<p class="warning-callout"><strong>DIMENSIONS AND PRINT LAYOUT ONLY.</strong> PixelProof does not check face position, expression, lighting, background, editing rules, eligibility, or application acceptance.</p><div class="form-grid">${field("Photo profile", '<select id="idProfile"><option value="us">US passport · 2×2 in / 51×51 mm</option><option value="ca">Canada passport · 50×70 mm</option><option value="uk">UK passport · 35×45 mm</option></select>')}${field("Paper", '<select id="idPaper"><option value="4x6">4×6 inch</option><option value="a4">A4</option></select>')}${field("Copies", '<input id="idCopies" type="number" min="1" max="20" value="6">')}</div><p class="hint">Sources and checked dates are shown before export. Use the result as a print layout, not proof of acceptance.</p><div id="id-source" class="profile-source"></div>`;
+  else if (id === "svg-raster")
+    html = `<p class="hint">SVG is rasterised locally after scripts, event handlers, and external resource references are removed. Choose the output pixel dimensions.</p><div class="form-grid">${field("Raster width", '<input id="svgWidth" type="number" min="1" max="8000" value="1200">')}${field("Raster height", '<input id="svgHeight" type="number" min="1" max="8000" value="1200">')}</div>`;
   else
     html = `<p class="hint">Creates WordPress and Shopify sizes from each source image. Outputs are named with the source stem and destination suffix.</p><div class="form-grid">${field("Export family", '<select id="family"><option value="all">WordPress + Shopify</option><option value="wordpress">WordPress sizes</option><option value="shopify">Shopify sizes</option></select>')}${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}</div>`;
   $("#control-content").innerHTML = html;
@@ -509,6 +585,12 @@ function renderControls() {
   if (id === "compare") $("#run-button").textContent = "Compare";
   if (id === "target-size") $("#run-button").textContent = "Hit target size";
   if (id === "metadata") $("#run-button").textContent = "Strip / export";
+  if (id === "image-to-pdf") {
+    $("#run-button").textContent = "Build PDF";
+    renderPdfPages();
+  }
+  if (id === "platform-profiles") setupPlatformProfileControls();
+  if (id === "id-print-sheet") setupIdSheetControls();
   if ($("#quality")) {
     let estimateTimer;
     $("#quality").oninput = (e) => {
@@ -523,6 +605,60 @@ function renderControls() {
   if (id === "crop") setupCropPreview();
   if (id === "metadata") updateMetadata();
   $("#controls").hidden = !state.files.length;
+}
+function renderPdfPages() {
+  const list = $("#pdf-pages");
+  if (!list) return;
+  const files = state.pdfOrder.length ? state.pdfOrder : state.files;
+  list.innerHTML = files.map((file, index) => `<div class="pdf-page" draggable="true" data-index="${index}"><span class="drag-handle">☷</span><strong>${index + 1}</strong><span>${escapeHtml(relativePath(file))}</span></div>`).join("");
+  let dragged;
+  list.querySelectorAll(".pdf-page").forEach((page) => {
+    page.ondragstart = () => { dragged = Number(page.dataset.index); page.classList.add("dragging"); };
+    page.ondragend = () => page.classList.remove("dragging");
+    page.ondragover = (event) => event.preventDefault();
+    page.ondrop = (event) => {
+      event.preventDefault();
+      const target = Number(page.dataset.index);
+      const ordered = [...files];
+      const [moved] = ordered.splice(dragged, 1);
+      ordered.splice(target, 0, moved);
+      state.pdfOrder = ordered;
+      renderPdfPages();
+    };
+  });
+}
+function setupPlatformProfileControls() {
+  const select = $("#platformProfile"), source = $("#platform-source");
+  const custom = JSON.parse(localStorage.getItem("pixelproof-platform-profiles") || "[]");
+  const profiles = [...PLATFORM_PROFILES, ...custom];
+  const apply = () => {
+    const profile = profiles.find((item) => item.id === select.value) || profiles[0];
+    $("#platformWidth").value = profile.width; $("#platformHeight").value = profile.height;
+    $("#platformMode").value = profile.mode || "fit"; $("#platformMime").value = profile.mime || "image/jpeg";
+    source.innerHTML = `Starting point · checked ${escapeHtml(profile.checked || "local")} · <a href="${escapeHtml(profile.source || "#")}" target="_blank" rel="noreferrer">published source</a>`;
+  };
+  select.onchange = apply; apply();
+  $("#save-platform-profile").onclick = () => {
+    const name = window.prompt("Name this editable platform profile");
+    if (!name?.trim()) return;
+    const saved = JSON.parse(localStorage.getItem("pixelproof-platform-profiles") || "[]");
+    saved.push({id: `custom-${Date.now()}`, name: name.trim().slice(0, 80), width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mode: $("#platformMode").value, mime: $("#platformMime").value, source: "User-edited from published guidance", checked: new Date().toISOString().slice(0, 10)});
+    localStorage.setItem("pixelproof-platform-profiles", JSON.stringify(saved));
+    renderControls();
+    $("#run-status").textContent = `Saved editable profile “${name.trim()}”.`;
+  };
+}
+function setupIdSheetControls() {
+  const sources = {
+    us: ["US passport: 51×51 mm; head guidance 25–35 mm", "https://travel.state.gov/content/travel/en/passports/how-apply/photos.html"],
+    ca: ["Canada passport: 50×70 mm", "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-passports/photos.html"],
+    uk: ["UK passport: 35×45 mm; face guidance 29–34 mm", "https://www.gov.uk/government/publications/passport-photos-guide-for-photographers/guidance-for-photographers"],
+  };
+  const update = () => {
+    const [text, url] = sources[$("#idProfile").value];
+    $("#id-source").innerHTML = `${escapeHtml(text)} · <a href="${url}" target="_blank" rel="noreferrer">official source</a> · checked 2026-08-11`;
+  };
+  $("#idProfile").onchange = update; update();
 }
 async function updateEstimate() {
   const output = $("#size-estimate");
@@ -851,6 +987,10 @@ async function options() {
     const metadata = await inspectMetadata(state.files[0]);
     return {type: "metadata", mime: "image/jpeg", quality: 0.92, metadata: {mode: $("#metadataMode").value, ...metadata.fields}};
   }
+  if (id === "platform-profiles") return {type: "resize", mode: $("#platformMode").value, width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mime: $("#platformMime").value};
+  if (id === "image-to-pdf") return {type: "pdf", pageSize: $("#pdfSize").value, orientation: $("#pdfOrientation").value, mode: $("#pdfMode").value, margin: Number($("#pdfMargin").value || 0)};
+  if (id === "id-print-sheet") return {type: "id-sheet", profile: $("#idProfile").value, paper: $("#idPaper").value, copies: Number($("#idCopies").value || 1)};
+  if (id === "svg-raster") return {type: "resize", mode: "exact", width: Number($("#svgWidth").value), height: Number($("#svgHeight").value), mime: "image/png"};
   if (id === "resize") {
     const mode = $("#mode").value;
     let w = Number($("#width").value),
@@ -946,7 +1086,7 @@ function stem(name) {
 function friendlyError(error) {
   const message = String(error?.message || error || "Unknown image-processing error.");
   if (/could not be decoded|decode|invalidstateerror/i.test(message))
-    return "This file could not be decoded as a supported image. Check that it is a real JPEG, PNG, WebP, or HEIC/HEIF file.";
+    return "This file could not be decoded as a supported image. Check that it is a real JPEG, PNG, WebP, HEIC/HEIF, BMP, GIF, ICO, or SVG file.";
   return message;
 }
 function escapeHtml(value) {
@@ -960,9 +1100,29 @@ function escapeHtml(value) {
 }
 async function processOne(file, op) {
   let input = file;
+  if (file.name.toLowerCase().endsWith(".svg") || file.type === "image/svg+xml") {
+    const text = await file.text();
+    const width = Number(op.svgWidth || $("#svgWidth")?.value || 1200);
+    const height = Number(op.svgHeight || $("#svgHeight")?.value || 1200);
+    const cleaned = text
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
+      .replace(/<style[\s\S]*?@import[\s\S]*?<\/style>/gi, "")
+      .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, "")
+      .replace(/\s(?:href|xlink:href)\s*=\s*(['"])(?!#).*?\1/gi, "");
+    const viewBox = cleaned.match(/viewBox\s*=\s*["']\s*([\d.+-]+)[ ,]+([\d.+-]+)[ ,]+([\d.+-]+)[ ,]+([\d.+-]+)\s*["']/i);
+    const replacement = `<svg width="${width}" height="${height}"${viewBox ? ` viewBox="${viewBox.slice(1).join(" ")}` : ""}`;
+    input = new File([cleaned.replace(/<svg\b/i, replacement)], `${file.name}.svg`, {type: "image/svg+xml"});
+    if (op.type === "svg-raster") op = {...op, type: "resize"};
+  }
   if (isHeic(file)) {
     const decoded = await decodeHeic(file, (message) => { $("#run-status").textContent = message; });
     input = new File([decoded.buffer], `${file.name}.png`, {type: "image/png"});
+  }
+  if (!input.type) {
+    const extension = file.name.toLowerCase().split(".").pop();
+    const types = {jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", bmp: "image/bmp", gif: "image/gif", ico: "image/x-icon", cur: "image/x-icon", apng: "image/apng"};
+    input = new File([await input.arrayBuffer()], file.name, {type: types[extension] || "image/jpeg"});
   }
   const worker = new Worker("./worker.js", {type: "module"});
   return new Promise((resolve, reject) => {
@@ -995,6 +1155,13 @@ function outputExtension(mime) {
   return Object.values(MIME).find((x) => x.mime === mime)?.ext || "png";
 }
 async function preflight(files) {
+  const foundAnimations = await inspectAnimations(files);
+  if (foundAnimations.length) {
+    state.animationFiles = [...new Set([...state.animationFiles, ...foundAnimations])];
+    renderAnimationWarning();
+  }
+  if (state.animationFiles.some((name) => files.some((file) => file.name === name)) && !$("#allow-animation")?.checked)
+    return `Animated input detected (${state.animationFiles.join(", ")}). Only the first frame will be processed. Confirm the warning before processing.`;
   const tier = getEntitlementState();
   if (files.length > tier.maxFiles)
     return `This batch has ${files.length} files, but ${tier.label} allows ${tier.maxFiles}. Remove these extras or upgrade: ${files.slice(tier.maxFiles).slice(0, 4).map((file) => file.name).join(", ")}${files.length - tier.maxFiles > 4 ? "…" : ""}`;
@@ -1006,7 +1173,7 @@ async function preflight(files) {
     }
     if (isHeic(file)) continue;
     try {
-      const image = await createImageBitmap(file);
+      const image = await createImageBitmap(file.type === "image/svg+xml" ? new Blob([await file.text()], {type: file.type}) : file);
       originalStats.set(file, {width: image.width, height: image.height});
       if (image.width * image.height > PRODUCT.maxPixels) oversized.push(`${file.name} (${image.width}×${image.height})`);
       image.close();
@@ -1031,6 +1198,8 @@ async function run(runFiles = state.files) {
     return;
   }
   if (state.tool === "face-blur") return;
+  if (state.tool === "image-to-pdf") return runPdfWorkspace(runFiles);
+  if (state.tool === "id-print-sheet") return runIdPrintSheet(runFiles);
   if (!runFiles.length) {
     $("#run-status").textContent = "Choose at least one image first.";
     return;
@@ -1137,6 +1306,69 @@ async function run(runFiles = state.files) {
       ? `Finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. See the output rows for next steps.`
       : `Finished ${done} output${done === 1 ? "" : "s"}.`;
   state.cancel = false;
+}
+async function runPdfWorkspace(runFiles) {
+  const message = await preflight(runFiles);
+  if (message) { $("#run-status").textContent = message; return; }
+  const button = $("#run-button");
+  state.running = true; button.disabled = true; $("#results").hidden = false; $("#result-list").innerHTML = "";
+  try {
+    const ordered = state.pdfOrder.length ? state.pdfOrder : runFiles;
+    const images = [];
+    for (const file of ordered) {
+      $("#run-status").textContent = `Preparing ${images.length + 1} of ${ordered.length} for PDF…`;
+      const encoded = await imageForPdf(file, {width: Number($("#svgWidth")?.value || 1200), height: Number($("#svgHeight")?.value || 1200)});
+      images.push({...encoded, source: file});
+    }
+    const pageSize = $("#pdfSize").value;
+    const output = $("#pdfOutput").value;
+    const margin = Number($("#pdfMargin").value || 0) * 72 / 25.4;
+    const make = async (items) => {
+      const first = items[0];
+      const [pageWidth, pageHeight] = pdfPageSize(pageSize, $("#pdfOrientation").value, first.width, first.height);
+      return generatePdf(items, {pageWidth, pageHeight, margin, mode: $("#pdfMode").value});
+    };
+    if (output === "single") {
+      for (let index = 0; index < images.length; index++) {
+        const bytes = await make([images[index]]);
+        state.results.push({name: `${stem(images[index].source.name)}.pdf`, bytes, mime: "application/pdf", source: images[index].source.name, sourcePath: relativePath(images[index].source), originalBytes: images[index].source.size});
+      }
+    } else {
+      const bytes = await make(images);
+      state.results = [{name: "pixelproof-images.pdf", bytes, mime: "application/pdf", source: `${images.length} images`, originalBytes: runFiles.reduce((sum, file) => sum + file.size, 0)}];
+    }
+    renderResults();
+    const total = state.results.reduce((sum, result) => sum + result.bytes.byteLength, 0);
+    $("#run-status").textContent = `PDF ready: ${Math.round(total / 1024)} KB across ${state.results.length} file${state.results.length === 1 ? "" : "s"}.`;
+    recordTask();
+  } catch (error) {
+    state.results = [{source: "PDF export", error: friendlyError(error)}]; renderResults();
+    $("#run-status").textContent = `PDF export failed: ${friendlyError(error)}`;
+  } finally { state.running = false; button.disabled = false; }
+}
+async function runIdPrintSheet(runFiles) {
+  const message = await preflight(runFiles.slice(0, 1));
+  if (message) { $("#run-status").textContent = message; return; }
+  const file = runFiles[0];
+  if (!file) return;
+  const profiles = {us: [51, 51], ca: [50, 70], uk: [35, 45]};
+  const papers = {"4x6": [152.4, 101.6], a4: [210, 297]};
+  const [photoW, photoH] = profiles[$("#idProfile").value], [paperW, paperH] = papers[$("#idPaper").value];
+  const image = await imageForPdf(file);
+  const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, Number($("#idCopies").value || 1));
+  state.results = [{name: `${stem(file.name)}-${$("#idProfile").value}-print-sheet.pdf`, bytes, mime: "application/pdf", source: file.name, originalBytes: file.size}];
+  renderResults();
+  $("#run-status").textContent = `Print sheet ready: ${photoW}×${photoH} mm photos on ${paperW}×${paperH} mm paper. Dimensions only; review all official requirements yourself.`;
+  recordTask();
+}
+async function generateIdSheet(image, photoW, photoH, paperW, paperH, copies) {
+  const worker = new Worker("./pdf-worker.js");
+  const payload = {idSheet: true, image, photoW, photoH, paperW, paperH, copies};
+  return new Promise((resolve, reject) => {
+    worker.onmessage = (event) => { worker.terminate(); event.data.ok ? resolve(event.data.bytes) : reject(new Error(event.data.error)); };
+    worker.onerror = (event) => { worker.terminate(); reject(event.error || new Error("Print-sheet worker failed")); };
+    worker.postMessage(payload, [image.bytes]);
+  });
 }
 async function runRecipe() {
   const files = state.files;
@@ -1246,7 +1478,8 @@ function renderResults() {
       const budget = r.resizedForBudget ? " · dimensions reduced to hit budget" : "";
       const original = r.originalStats ? ` · was ${r.originalStats.width}×${r.originalStats.height}` : "";
       const sourceBytes = r.originalBytes ? ` · was ${Math.round(r.originalBytes / 1024)} KB` : "";
-      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${escapeHtml(r.name)}</div><div class="result-meta">${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB${sourceBytes} · ${r.width}×${r.height}${original}${quality}${budget}</div></div><a class="btn" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
+      const dimensions = r.width && r.height ? ` · ${r.width}×${r.height}` : "";
+      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${escapeHtml(r.name)}</div><div class="result-meta">${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB${sourceBytes}${dimensions}${original}${quality}${budget}</div></div><a class="btn" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
       if (r.sourcePath) row.querySelector(".result-meta").textContent += ` · ${r.sourcePath}`;
     } else {
       row.innerHTML = `<div></div><div><div class="result-name">${escapeHtml(r.sourcePath || r.source)}</div><div class="error">${escapeHtml(r.error)}</div><button class="text-button retry-result">Retry this file</button></div>`;

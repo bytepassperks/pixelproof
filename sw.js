@@ -1,4 +1,4 @@
-const CACHE = "pixelproof-shell-20260811-10";
+const CACHE = "pixelproof-shell-20260811-11";
 const SHELL = [
   "./",
   "./index.html",
@@ -18,9 +18,12 @@ const SHELL = [
   "./worker.js",
   "./heic-decoder-worker.js",
   "./zip.js",
+  "./pdf.js",
+  "./pdf-worker.js",
   "./manifest.webmanifest",
   "./vendor/heic/libheif.js",
   "./vendor/heic/libheif.wasm",
+  "./vendor/pdf-lib/pdf-lib.min.js",
 ];
 
 self.addEventListener("install", (event) => {
