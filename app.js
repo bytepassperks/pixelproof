@@ -192,6 +192,8 @@ const supportedFormats = new Set();
 const originalStats = new WeakMap();
 const RECIPE_KEY = "pixelproof-recipes";
 const SETTINGS_KEY = "pixelproof-tool-settings";
+const RECOVERY_DB = "pixelproof-recovery";
+const IOS_PIXEL_LIMIT = 24_000_000;
 const recipes = [
   {
     id: "web",
@@ -258,6 +260,63 @@ const recipes = [
     note: "Face blur remains an explicit manual review in the Face blur tool; this recipe never claims automatic face detection.",
   },
 ];
+function announce(message, kind = "") {
+  ["#run-status", "#recipe-status"].forEach((selector) => {
+    const node = $(selector);
+    if (!node) return;
+    node.textContent = message;
+    node.classList.toggle("error", kind === "error");
+    node.classList.toggle("success", kind === "success");
+  });
+}
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function recoveryStore(mode, value) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(RECOVERY_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("outputs", {keyPath: "id"});
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction("outputs", mode);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.oncomplete = () => resolve();
+      if (mode === "readwrite") transaction.objectStore("outputs").put(value);
+      else {
+        const get = transaction.objectStore("outputs").getAll();
+        get.onsuccess = () => resolve(get.result);
+      }
+    };
+  });
+}
+async function rememberOutput(result) {
+  if (!result?.bytes) return;
+  try {
+    await recoveryStore("readwrite", {
+      id: `${Date.now()}-${Math.random()}`,
+      name: result.name,
+      source: result.source || "",
+      sourcePath: result.sourcePath || "",
+      mime: result.mime,
+      bytes: result.bytes,
+      originalBytes: result.originalBytes || 0,
+      savedAt: Date.now(),
+    });
+  } catch {}
+}
+async function restoreRecovery() {
+  try {
+    const saved = await recoveryStore("readonly");
+    if (!saved?.length || state.results.length) return;
+    const recent = saved.filter((item) => Date.now() - item.savedAt < 24 * 60 * 60 * 1000);
+    if (!recent.length) return;
+    state.results = recent.map((item) => ({...item, bytes: item.bytes}));
+    $("#results").hidden = false;
+    renderResults();
+    announce(`${recent.length} completed output${recent.length === 1 ? "" : "s"} recovered from your last interrupted job.`, "success");
+  } catch {}
+}
 function allRecipes() {
   try {
     return [...recipes, ...JSON.parse(localStorage.getItem(RECIPE_KEY) || "[]")];
@@ -371,6 +430,10 @@ document
 document.title = `${PRODUCT.brand} — private image tools`;
 $("#isolation-text").textContent =
   `LOCAL / ${crossOriginIsolated ? "ISOLATED" : "NON-ISOLATED"}`;
+if (isIOS()) {
+  $("#isolation-text").textContent += " · iOS safety limits active";
+  $("#isolation-text").title = "Large images and batches are capped on iPhone and iPad to reduce Safari memory termination risk.";
+}
 $("#isolation-dot").parentElement.classList.add(
   crossOriginIsolated ? "good" : "bad",
 );
@@ -405,12 +468,19 @@ document.addEventListener("paste", (event) => {
   }),
 );
 $("#dropzone").ondrop = (e) => addFiles(e.dataTransfer.files);
-$("#dropzone").onkeydown = (e) => {
-  if (e.key === "Enter" || e.key === " ") {
-    e.preventDefault();
-    $("#file-input").click();
-  }
-};
+window.addEventListener("beforeunload", (event) => {
+  if (!state.running) return;
+  event.preventDefault();
+  event.returnValue = "Processing is still running. Completed outputs will remain recoverable, but leaving may stop the batch.";
+});
+document.addEventListener("visibilitychange", () => {
+  if (state.running && document.visibilityState === "hidden")
+    announce("This tab is in the background. Keep it open; completed outputs are saved as they finish.");
+  else if (state.running)
+    announce("Processing resumed in the foreground.");
+});
+window.addEventListener("offline", () => announce("You are offline. Local image processing can continue; model downloads and app updates cannot.", "error"));
+window.addEventListener("online", () => announce("Connection restored. Local processing remains in this tab.", "success"));
 $("#reset-tool").onclick = () => {
   const all = savedSettings();
   delete all[state.tool];
@@ -424,9 +494,14 @@ function selectTool(id) {
   state.results = [];
   $("#run-status").textContent = "";
   $("#results").hidden = true;
-  document
-    .querySelectorAll(".tool-link")
-    .forEach((b) => b.classList.toggle("active", b.dataset.tool === id));
+document
+  .querySelectorAll(".tool-link")
+    .forEach((b) => {
+      const active = b.dataset.tool === id;
+      b.classList.toggle("active", active);
+      if (active) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
   const tool = toolDefs.find((x) => x.id === id);
   $("#tool-kicker").textContent = tool.kicker;
   $("#tool-title").textContent = tool.title;
@@ -903,11 +978,48 @@ function setupEditorPreview() {
 }
 function mountFaceBlur() {
   state.faceBoxes = [];
-  $("#control-content").innerHTML = '<p class="hint">Manual review only: this build does not claim to detect every face. Drag boxes over every face or private region, then confirm the reviewed result before export.</p><canvas id="face-canvas" class="tool-preview" width="640" height="420"></canvas><div class="form-grid"><div class="field"><label>Method</label><select id="blurMode"><option value="blur">Blur</option><option value="pixelate">Pixelate</option></select></div><div class="field"><label>Strength</label><input id="blurStrength" type="range" min="4" max="32" value="12"></div></div><button class="text-button" id="face-delete">Delete last box</button><label class="check"><input id="face-confirm" type="checkbox"> I reviewed every box and confirm this export</label><div class="run-row"><button class="btn primary" id="face-run">Process reviewed boxes</button><button class="btn" id="face-export" hidden>Export privacy copy</button><span class="mono" id="face-status">Drag on the image to add a box.</span></div>';
+  $("#control-content").innerHTML = '<p class="hint">Manual review only: this build does not claim to detect every face. Drag boxes over every face or private region, or add regions numerically below for a keyboard and screen-reader accessible path.</p><canvas id="face-canvas" class="tool-preview" width="640" height="420" tabindex="0" aria-label="Visual preview of privacy regions"></canvas><div class="form-grid"><div class="field"><label for="blurMode">Method</label><select id="blurMode"><option value="blur">Blur</option><option value="pixelate">Pixelate</option></select></div><div class="field"><label for="blurStrength">Strength</label><input id="blurStrength" type="range" min="4" max="32" value="12"></div></div><section class="face-regions" aria-labelledby="face-regions-title"><h3 id="face-regions-title">Reviewed regions</h3><p class="hint">Enter source-image pixels. Arrow keys nudge a focused value by one pixel; use Add region to create a box without a mouse.</p><div id="face-region-list" aria-live="polite"></div><button class="btn" id="face-add-region" type="button">Add region</button></section><button class="text-button" id="face-delete">Delete last box</button><label class="check"><input id="face-confirm" type="checkbox"> I reviewed every box and confirm this export</label><div class="run-row"><button class="btn primary" id="face-run">Process reviewed boxes</button><button class="btn" id="face-export" hidden>Export privacy copy</button><span class="mono" id="face-status" role="status" aria-live="polite">Drag on the image to add a box.</span></div>';
   const canvas = $("#face-canvas"), file = state.files[0];
   if (!file) return;
   const image = new Image(), context = canvas.getContext("2d");
   let start = null;
+  const renderRegions = () => {
+    const list = $("#face-region-list");
+    list.innerHTML = "";
+    state.faceBoxes.forEach((box, index) => {
+      const row = document.createElement("div");
+      row.className = "face-region";
+      row.innerHTML = `<strong>Region ${index + 1}</strong><div class="form-grid">${["x", "y", "width", "height"].map((key) => `<label>${key}<input type="number" min="0" step="1" data-face-index="${index}" data-face-key="${key}" value="${Math.round(box[key])}"></label>`).join("")}</div><button class="text-button" type="button" data-face-remove="${index}">Remove region</button>`;
+      list.append(row);
+    });
+    list.querySelectorAll("[data-face-index]").forEach((input) => {
+      input.oninput = () => {
+        const box = state.faceBoxes[Number(input.dataset.faceIndex)];
+        const key = input.dataset.faceKey;
+        const value = Math.max(0, Number(input.value) || 0);
+        box[key] = key === "x" ? state.faceScale.ox + value * state.faceScale.scale
+          : key === "y" ? state.faceScale.oy + value * state.faceScale.scale
+            : value * state.faceScale.scale;
+        draw();
+      };
+    });
+    list.querySelectorAll("[data-face-remove]").forEach((button) => {
+      button.onclick = () => {
+        state.faceBoxes.splice(Number(button.dataset.faceRemove), 1);
+        renderRegions();
+        draw();
+        $("#face-status").textContent = `${state.faceBoxes.length} reviewed region${state.faceBoxes.length === 1 ? "" : "s"}.`;
+      };
+    });
+  };
+  const addRegion = (box = {x: 0, y: 0, width: 100, height: 100}) => {
+    state.faceBoxes.push(box);
+    renderRegions();
+    draw();
+    const first = $("#face-region-list input");
+    first?.focus();
+    $("#face-status").textContent = `${state.faceBoxes.length} reviewed region${state.faceBoxes.length === 1 ? "" : "s"}.`;
+  };
   const draw = () => {
     context.clearRect(0, 0, canvas.width, canvas.height);
     const scale = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
@@ -926,7 +1038,9 @@ function mountFaceBlur() {
     state.faceBoxes.pop();
     draw();
     $("#face-status").textContent = `${state.faceBoxes.length} reviewed box${state.faceBoxes.length === 1 ? "" : "es"}.`;
+    renderRegions();
   };
+  $("#face-add-region").onclick = () => addRegion();
   canvas.onpointerdown = (event) => { const rect = canvas.getBoundingClientRect(); start = {x: event.clientX - rect.left, y: event.clientY - rect.top}; };
   canvas.onpointerup = (event) => {
     if (!start) return;
@@ -934,7 +1048,7 @@ function mountFaceBlur() {
     const end = {x: event.clientX - rect.left, y: event.clientY - rect.top};
     const box = {x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), width: Math.abs(end.x - start.x), height: Math.abs(end.y - start.y)};
     if (box.width > 4 && box.height > 4) state.faceBoxes.push(box);
-    start = null; draw();
+    start = null; renderRegions(); draw();
     $("#face-status").textContent = `${state.faceBoxes.length} reviewed box${state.faceBoxes.length === 1 ? "" : "es"}.`;
   };
   $("#face-run").onclick = async () => {
@@ -1180,6 +1294,16 @@ async function preflight(files) {
     } catch {}
   }
   if (oversized.length) return `These files exceed the browser pixel limit before processing: ${oversized.join(", ")}. Resize them first or remove them from the batch.`;
+  if (isIOS()) {
+    const iosOversized = files.filter((file) => {
+      const stats = originalStats.get(file);
+      return stats && stats.width * stats.height > IOS_PIXEL_LIMIT;
+    });
+    if (iosOversized.length)
+      return `iPhone/iPad safety limit: ${iosOversized.map((file) => file.name).join(", ")} exceeds 24 MP. Resize large phone images before processing to avoid Safari memory termination.`;
+    if (files.length > 25)
+      return `iPhone/iPad safety limit: this ${files.length}-file batch is too large for reliable mobile memory. Process 25 files or fewer at a time.`;
+  }
   if (!canUseTool(state.tool, {fileCount: files.length, task: true}))
     return limitMessage(state.tool, {fileCount: files.length, task: true});
   return "";
@@ -1272,6 +1396,7 @@ async function run(runFiles = state.files) {
           originalBytes: task.file.size,
           originalStats: originalStats.get(task.file),
         });
+        rememberOutput(outputs[outputs.length - 1]);
       } catch (error) {
         outputs.push({
           name: task.name,
@@ -1408,6 +1533,7 @@ async function runRecipe() {
           const directory = relativePath(file).split("/").slice(0, -1).join("/");
           const name = `${stem(file.name)}-${suffix}.${outputExtension(result.mime)}`;
           outputs.push({...result, name: uniqueName(directory ? `${directory}/${name}` : name, usedNames), source: file.name, sourcePath: relativePath(file), file, originalBytes: file.size, originalStats: originalStats.get(file)});
+          rememberOutput(outputs[outputs.length - 1]);
         }
       } else {
         let input = file, result;
@@ -1419,6 +1545,7 @@ async function runRecipe() {
         const directory = relativePath(file).split("/").slice(0, -1).join("/");
         const name = `${stem(file.name)}-${stem(state.recipe.name)}.${outputExtension(result.mime)}`;
         outputs.push({...result, name: uniqueName(directory ? `${directory}/${name}` : name, usedNames), source: file.name, sourcePath: relativePath(file), file, originalBytes: file.size, originalStats: originalStats.get(file)});
+        rememberOutput(outputs[outputs.length - 1]);
       }
       completed++;
       } catch (error) {
@@ -1489,11 +1616,18 @@ function renderResults() {
   }
   if (good.length) {
     $("#download-zip").hidden = false;
-    $("#download-zip").onclick = () =>
-      downloadZip(
-        good.map((x) => ({ name: x.name, bytes: x.bytes })),
-        "pixelproof-results.zip",
-      );
+    $("#download-zip").onclick = async () => {
+      try {
+        const total = good.reduce((sum, result) => sum + result.bytes.byteLength, 0);
+        const estimate = await navigator.storage?.estimate?.();
+        if (estimate?.quota && estimate.quota - estimate.usage < total * 1.2)
+          announce("There may not be enough browser storage for this ZIP. Try saving to a folder or download fewer results.", "error");
+        await downloadZip(good.map((x) => ({ name: x.name, bytes: x.bytes })), "pixelproof-results.zip");
+        announce(`ZIP ready: ${good.length} output${good.length === 1 ? "" : "s"}.`, "success");
+      } catch (error) {
+        announce(`ZIP export failed: ${friendlyError(error)}. Try saving fewer results or use Save to folder.`, "error");
+      }
+    };
     if ("showDirectoryPicker" in window) {
       $("#save-folder").hidden = false;
       $("#save-folder").onclick = () => saveResultsToFolder(good);
@@ -1502,6 +1636,10 @@ function renderResults() {
 }
 async function saveResultsToFolder(results) {
   try {
+    const total = results.reduce((sum, result) => sum + result.bytes.byteLength, 0);
+    const estimate = await navigator.storage?.estimate?.();
+    if (estimate?.quota && estimate.quota - estimate.usage < total * 1.2)
+      announce("There may not be enough space for this folder export. Use Download ZIP or save fewer results.", "error");
     const root = await window.showDirectoryPicker({mode: "readwrite"});
     for (const result of results) {
       const parts = result.name.split("/");
@@ -1513,17 +1651,16 @@ async function saveResultsToFolder(results) {
       await writable.write(result.bytes);
       await writable.close();
     }
-    $("#run-status").textContent = `Saved ${results.length} result${results.length === 1 ? "" : "s"} to the selected folder.`;
-    $("#recipe-status").textContent = `Saved ${results.length} result${results.length === 1 ? "" : "s"} to the selected folder.`;
+    announce(`Saved ${results.length} result${results.length === 1 ? "" : "s"} to the selected folder.`, "success");
   } catch (error) {
     if (error?.name !== "AbortError") {
-      $("#run-status").textContent = `Folder save failed: ${error.message}. Use Download ZIP instead.`;
-      $("#recipe-status").textContent = `Folder save failed: ${error.message}. Use Download ZIP instead.`;
+      announce(`Folder save failed: ${friendlyError(error)}. Use Download ZIP instead.`, "error");
     }
   }
 }
 selectTool("compress");
 initRecipes();
+restoreRecovery();
 detectFormats();
 async function detectFormats() {
   const canvas = document.createElement("canvas");

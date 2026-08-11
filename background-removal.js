@@ -244,7 +244,13 @@ export function mountBackgroundTool(container, context) {
     bandPreset: element("select"),
     clean: element("input", { type: "checkbox" }),
     background: element("select"),
+    x: element("input", {type: "number", min: "0", max: "1024", value: "512", "aria-label": "Selection X coordinate"}),
+    y: element("input", {type: "number", min: "0", max: "1024", value: "512", "aria-label": "Selection Y coordinate"}),
+    sign: element("select", {"aria-label": "Selection point type"}),
+    point: element("button", {class: "btn", type: "button"}, "Set selection point"),
   };
+  controls.sign.append(element("option", {value: "1"}, "Positive subject point"));
+  controls.sign.append(element("option", {value: "0"}, "Negative background point"));
   [
     ["checkerboard", "Checkerboard"],
     ["#ffffff", "White"],
@@ -287,8 +293,10 @@ export function mountBackgroundTool(container, context) {
     "Model downloads begin only when you run the tool.",
   );
   const row = element("div", { class: "run-row" });
+  const pointGrid = element("div", {class: "form-grid background-point"});
+  pointGrid.append(field("X (0–1024)", controls.x), field("Y (0–1024)", controls.y), field("Point type", controls.sign), controls.point);
   row.append(controls.run, controls.export, status);
-  container.append(notice, canvas, grid, row);
+  container.append(notice, canvas, pointGrid, grid, row);
   const file = context.files[0];
   if (file) {
     const drawSource = (source) => {
@@ -313,6 +321,36 @@ export function mountBackgroundTool(container, context) {
     } else {
       drawSource(file);
     }
+    const setPoint = (x, y, label) => {
+      const boundedX = Math.max(0, Math.min(1024, Math.round(x)));
+      const boundedY = Math.max(0, Math.min(1024, Math.round(y)));
+      controls.x.value = String(boundedX);
+      controls.y.value = String(boundedY);
+      current.clicks = [{x: boundedX, y: boundedY, label}];
+      const displayX = Math.round((boundedX * canvas.width) / 1024);
+      const displayY = Math.round((boundedY * canvas.height) / 1024);
+      status.textContent = `${label ? "Positive" : "Negative"} selection point set at ${boundedX}, ${boundedY}.`;
+      const context2d = canvas.getContext("2d");
+      context2d.fillStyle = label ? "#ffe45c" : "#e02b1d";
+      context2d.beginPath();
+      context2d.arc(displayX, displayY, Math.max(8, canvas.width / 80), 0, Math.PI * 2);
+      context2d.fill();
+    };
+    controls.point.onclick = () => setPoint(Number(controls.x.value), Number(controls.y.value), Number(controls.sign.value));
+    canvas.onkeydown = (event) => {
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === "Enter" || event.key === " ") {
+        setPoint(Number(controls.x.value), Number(controls.y.value), Number(controls.sign.value));
+        return;
+      }
+      const delta = event.shiftKey ? 10 : 1;
+      if (event.key === "ArrowLeft") controls.x.value = String(Math.max(0, Number(controls.x.value) - delta));
+      if (event.key === "ArrowRight") controls.x.value = String(Math.min(1024, Number(controls.x.value) + delta));
+      if (event.key === "ArrowUp") controls.y.value = String(Math.max(0, Number(controls.y.value) - delta));
+      if (event.key === "ArrowDown") controls.y.value = String(Math.min(1024, Number(controls.y.value) + delta));
+      status.textContent = `Selection point ${controls.x.value}, ${controls.y.value}. Press Enter to set it.`;
+    };
     canvas.onclick = (event) => {
       const rect = canvas.getBoundingClientRect();
       const x = Math.round(
@@ -323,15 +361,8 @@ export function mountBackgroundTool(container, context) {
       );
       const modelX = Math.round((x * 1024) / canvas.width);
       const modelY = Math.round((y * 1024) / canvas.height);
-      current.clicks = [
-        { x: modelX, y: modelY, label: event.shiftKey ? 0 : 1 },
-      ];
+      setPoint((modelX * 1024) / canvas.width, (modelY * 1024) / canvas.height, event.shiftKey ? 0 : 1);
       status.textContent = `${event.shiftKey ? "Negative" : "Positive"} click registered at ${x}, ${y} → model ${modelX}, ${modelY}`;
-      const context2d = canvas.getContext("2d");
-      context2d.fillStyle = event.shiftKey ? "#e02b1d" : "#ffe45c";
-      context2d.beginPath();
-      context2d.arc(x, y, Math.max(8, canvas.width / 80), 0, Math.PI * 2);
-      context2d.fill();
     };
   }
   controls.background.onchange = () =>

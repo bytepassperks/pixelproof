@@ -2,16 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Private browser-local image tools for serious batches.">
-  <title>Private browser image tools</title>
+  <meta name="description" content="Compress image, resize, convert HEIC to JPG, and turn images to PDF locally in your browser. No uploads, with honest batch limits.">
+  <meta name="theme-color" content="#12203a">
+  <link rel="canonical" href="https://pixelproof.pages.dev/app.html">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
+  <a class="skip-link" href="#job-start">Skip to recipe and upload controls</a>
   <header class="topbar"><a class="brand" href="./"><span class="brand-mark">PP</span><span data-brand>PixelProof</span></a><span class="privacy">LOCAL ONLY / NEVER UPLOADED</span><button class="help" id="about-button">How it works</button></header>
   <main class="shell">
     <aside class="sidebar" aria-label="Tools"><p class="eyebrow">IMAGE WORKBENCH</p><nav id="tool-nav"></nav><div class="sidebar-note"><b>PRIVATE BY DEFAULT</b><span>Your files stay in this tab. Nothing is sent to a server.</span></div></aside>
-    <section class="workbench">
+    <section class="workbench" id="job-start" tabindex="-1" aria-labelledby="tool-title">
       <section class="recipe-panel card" id="recipe-panel">
         <div class="control-head"><div><p class="eyebrow">START WITH THE JOB</p><h2>Recipes, not tool hunting.</h2><p class="recipe-lede">Choose a complete batch workflow, inspect every step, and change anything before you run it.</p></div><button class="text-button" id="toggle-tools">Use individual tools</button></div>
         <div class="recipe-toolbar"><select id="recipe-select" aria-label="Choose a recipe"></select><button class="btn primary" id="recipe-run">Run recipe</button><button class="btn" id="recipe-save">Save as recipe</button><button class="text-button" id="recipe-export">Export recipe</button><button class="text-button" id="recipe-import">Import recipe</button><input id="recipe-import-file" type="file" accept="application/json,.json" hidden></div>
@@ -19,9 +22,9 @@
         <p class="recipe-status mono" id="recipe-status"></p>
       </section>
       <div class="heading"><div><p class="eyebrow" id="tool-kicker">TOOL / COMPRESS</p><h1 id="tool-title">Compress without guessing.</h1><p id="tool-description">Control quality while seeing the output size before you download.</p></div><div class="isolation"><span id="isolation-dot"></span><span id="isolation-text">Checking local runtime…</span></div></div>
-      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose images"><div class="drop-icon">＋</div><h2>Drop images here</h2><p>or choose files / a folder</p><div class="drop-actions"><button class="btn primary" id="choose-files">Choose files</button><button class="btn" id="choose-folder">Choose folder</button></div><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/bmp,image/gif,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,.heic,.heif,.bmp,.gif,.ico,.cur,.svg,.apng" multiple hidden><input id="folder-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/bmp,image/gif,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,.heic,.heif,.bmp,.gif,.ico,.cur,.svg,.apng" webkitdirectory multiple hidden><small>JPEG · PNG · WebP · HEIC/HEIF · BMP · static GIF · ICO · SVG · batch-ready</small></div>
+      <div class="dropzone" id="dropzone"><div class="drop-icon" aria-hidden="true">＋</div><h2>Drop images here</h2><p>or choose files / a folder</p><div class="drop-actions"><button class="btn primary" id="choose-files">Choose files</button><button class="btn" id="choose-folder">Choose folder</button></div><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/bmp,image/gif,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,.heic,.heif,.bmp,.gif,.ico,.cur,.svg,.apng" multiple hidden><input id="folder-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/bmp,image/gif,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,.heic,.heif,.bmp,.gif,.ico,.cur,.svg,.apng" webkitdirectory multiple hidden><small>JPEG · PNG · WebP · HEIC/HEIF · BMP · static GIF · ICO · SVG · batch-ready</small></div>
       <div id="file-summary" class="file-summary" hidden></div>
-      <section class="controls card" id="controls" hidden><div class="control-head"><span class="eyebrow">OPERATION SET</span><button class="text-button" id="reset-tool">Reset</button></div><div id="control-content"></div><div class="run-row"><button class="btn primary" id="run-button">Process images</button><span id="run-status" role="status"></span></div></section>
+      <section class="controls card" id="controls" hidden><div class="control-head"><span class="eyebrow">OPERATION SET</span><button class="text-button" id="reset-tool">Reset</button></div><div id="control-content"></div><div class="run-row"><button class="btn primary" id="run-button">Process images</button><span id="run-status" role="status" aria-live="polite" aria-atomic="true"></span></div></section>
       <section class="results card" id="results" hidden><div class="control-head"><span class="eyebrow">OUTPUTS</span><div class="result-actions"><button class="btn" id="save-folder" hidden>Save to folder</button><button class="btn" id="download-zip" hidden>Download ZIP</button></div></div><div id="result-list"></div></section>
     </section>
   </main>
@@ -31,5 +34,6 @@
   <script>
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js", {updateViaCache: "none"}).catch(() => {});
   </script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"PixelProof","applicationCategory":"MultimediaApplication","operatingSystem":"Web browser","url":"https://pixelproof.pages.dev/","description":"Private browser-local image tools for compressing, resizing, converting HEIC to JPG, and creating PDFs without uploading files.","offers":{"@type":"Offer","price":"49","priceCurrency":"USD"},"featureList":["Compress image","Resize image","HEIC to JPG","Images to PDF","Batch folder processing"]}</script>
 </body>
 </html>

@@ -27,6 +27,11 @@ assets=(
   sw.js
   manifest.webmanifest
   THIRD_PARTY_NOTICES
+  robots.txt
+  sitemap.xml
+  favicon.svg
+  social-preview.svg
+  404.html
   vendor/heic/libheif.js
   vendor/heic/libheif.wasm
   vendor/pdf-lib/pdf-lib.min.js

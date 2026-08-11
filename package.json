@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "audit:a11y": "axe https://pixelproof.pages.dev/ --exit"
+  },
+  "devDependencies": {
+    "@axe-core/cli": "^4.10.2"
+  }
+}
