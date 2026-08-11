@@ -5,6 +5,12 @@ processed in the browser; the licensing Worker does not receive image data.
 The static app is designed for Cloudflare Pages and uses cross-origin
 isolation so future threaded browser inference remains available.
 
+The workbench includes photo adjustments, meme captions, assisted manual face
+blur, favicon and app-icon sets, social presets, bulk naming, palette
+extraction, compression comparison, saved local presets, web exports, and
+prompted background removal. Face blur intentionally requires box review and
+explicit confirmation before export; it does not claim automatic detection.
+
 ## Phase 3 architecture
 
 - `index.html` is the marketing page; `app.html` is the workbench.
