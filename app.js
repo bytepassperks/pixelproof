@@ -1,71 +1,498 @@
-import {PRODUCT, MIME, TIERS} from './config.js';
-import {registerTool, listTools} from './registry.js';
-import {downloadZip} from './zip.js';
-import {canUseTool} from './entitlements.js';
+import { PRODUCT, MIME, TIERS } from "./config.js";
+import { registerTool, listTools } from "./registry.js";
+import { downloadZip } from "./zip.js";
+import { canUseTool } from "./entitlements.js";
+import { mountBackgroundTool } from "./background-removal.js";
 
 const toolDefs = [
-  {id:'compress', label:'Compress', kicker:'TOOL / COMPRESS', title:'Compress without guessing.', description:'Control quality while seeing output size before you download.'},
-  {id:'resize', label:'Resize', kicker:'TOOL / RESIZE', title:'Resize for the destination.', description:'Use exact dimensions, percentage, or a fit-within preset.'},
-  {id:'crop', label:'Crop', kicker:'TOOL / CROP', title:'Crop the frame.', description:'Set a precise crop or use a common aspect ratio.'},
-  {id:'transform', label:'Rotate / flip', kicker:'TOOL / TRANSFORM', title:'Turn the image, not the workflow.', description:'Rotate and flip without leaving the workbench.'},
-  {id:'convert', label:'Convert', kicker:'TOOL / CONVERT', title:'Convert cleanly.', description:'Move between JPEG, PNG, and WebP with an honest MIME check.'},
-  {id:'watermark', label:'Watermark', kicker:'TOOL / WATERMARK', title:'Mark the work.', description:'Add text or an image watermark with control over placement and opacity.'},
-  {id:'web-export', label:'Web export', kicker:'WORKFLOW / WEB EXPORT', title:'One source. Every web size.', description:'Emit correctly named WordPress and Shopify responsive assets at once.'},
+  {
+    id: "compress",
+    label: "Compress",
+    kicker: "TOOL / COMPRESS",
+    title: "Compress without guessing.",
+    description:
+      "Control quality while seeing output size before you download.",
+  },
+  {
+    id: "resize",
+    label: "Resize",
+    kicker: "TOOL / RESIZE",
+    title: "Resize for the destination.",
+    description: "Use exact dimensions, percentage, or a fit-within preset.",
+  },
+  {
+    id: "crop",
+    label: "Crop",
+    kicker: "TOOL / CROP",
+    title: "Crop the frame.",
+    description: "Set a precise crop or use a common aspect ratio.",
+  },
+  {
+    id: "transform",
+    label: "Rotate / flip",
+    kicker: "TOOL / TRANSFORM",
+    title: "Turn the image, not the workflow.",
+    description: "Rotate and flip without leaving the workbench.",
+  },
+  {
+    id: "convert",
+    label: "Convert",
+    kicker: "TOOL / CONVERT",
+    title: "Convert cleanly.",
+    description: "Move between JPEG, PNG, and WebP with an honest MIME check.",
+  },
+  {
+    id: "watermark",
+    label: "Watermark",
+    kicker: "TOOL / WATERMARK",
+    title: "Mark the work.",
+    description:
+      "Add text or an image watermark with control over placement and opacity.",
+  },
+  {
+    id: "web-export",
+    label: "Web export",
+    kicker: "WORKFLOW / WEB EXPORT",
+    title: "One source. Every web size.",
+    description:
+      "Emit correctly named WordPress and Shopify responsive assets at once.",
+  },
+  {
+    id: "background-removal",
+    label: "Background removal",
+    kicker: "ASSISTED / BACKGROUND",
+    title: "Click the subject. Keep the edges.",
+    description:
+      "Prompted selection plus continuous alpha matting. Preview before export.",
+  },
 ];
 toolDefs.forEach(registerTool);
-const $ = s => document.querySelector(s);
-const state = {tool:'compress', files:[], results:[], urls:[], running:false, cancel:false};
+const $ = (s) => document.querySelector(s);
+const state = {
+  tool: "compress",
+  files: [],
+  results: [],
+  urls: [],
+  running: false,
+  cancel: false,
+};
 const supportedFormats = new Set();
-const nav = $('#tool-nav');
-toolDefs.forEach(tool => { const button=document.createElement('button'); button.className='tool-link'; button.dataset.tool=tool.id; button.innerHTML=`${tool.label}<span>→</span>`; button.onclick=()=>selectTool(tool.id); nav.append(button); });
-document.querySelectorAll('[data-brand]').forEach(el => el.textContent = PRODUCT.brand);
+const nav = $("#tool-nav");
+toolDefs.forEach((tool) => {
+  const button = document.createElement("button");
+  button.className = "tool-link";
+  button.dataset.tool = tool.id;
+  button.innerHTML = `${tool.label}<span>→</span>`;
+  button.onclick = () => selectTool(tool.id);
+  nav.append(button);
+});
+document
+  .querySelectorAll("[data-brand]")
+  .forEach((el) => (el.textContent = PRODUCT.brand));
 document.title = `${PRODUCT.brand} — private image tools`;
-$('#isolation-text').textContent = `LOCAL / ${crossOriginIsolated ? 'ISOLATED' : 'NON-ISOLATED'}`;
-$('#isolation-dot').parentElement.classList.add(crossOriginIsolated ? 'good' : 'bad');
-$('#dialog-isolation').textContent = String(crossOriginIsolated);
-$('#about-button').onclick=()=>$('#about-dialog').showModal(); $('#close-about').onclick=()=>$('#about-dialog').close();
-$('#choose-files').onclick=()=>$('#file-input').click(); $('#choose-folder').onclick=()=>$('#folder-input').click();
-$('#file-input').onchange=e=>addFiles(e.target.files); $('#folder-input').onchange=e=>addFiles(e.target.files);
-['dragenter','dragover'].forEach(type=>$('#dropzone').addEventListener(type,e=>{e.preventDefault();$('#dropzone').classList.add('drag')}));
-['dragleave','drop'].forEach(type=>$('#dropzone').addEventListener(type,e=>{e.preventDefault();$('#dropzone').classList.remove('drag')}));
-$('#dropzone').ondrop=e=>addFiles(e.dataTransfer.files); $('#dropzone').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#file-input').click()}};
-$('#reset-tool').onclick=()=>renderControls(); $('#run-button').onclick=()=>state.running?state.cancel=true:run();
-function selectTool(id){state.tool=id; state.results=[]; $('#results').hidden=true; document.querySelectorAll('.tool-link').forEach(b=>b.classList.toggle('active',b.dataset.tool===id)); const tool=toolDefs.find(x=>x.id===id); $('#tool-kicker').textContent=tool.kicker;$('#tool-title').textContent=tool.title;$('#tool-description').textContent=tool.description;renderControls();}
-function addFiles(list){const incoming=[...list].filter(f=>/^image\/(jpeg|png|webp)$/.test(f.type)); if(!incoming.length)return; state.files=[...state.files,...incoming].slice(0,TIERS.limits.maxFiles); const oversized=state.files.find(f=>f.size>PRODUCT.maxPixels*4); $('#file-summary').hidden=false; $('#file-summary').innerHTML=`<span>${state.files.length} image${state.files.length===1?'':'s'} ready</span><span>${oversized?'Large files will be checked before processing.':'Nothing leaves this browser.'}</span>`; $('#controls').hidden=false; renderControls();}
-function field(label,html,wide=''){return `<div class="field ${wide}"><label>${label}</label>${html}</div>`}
-function renderControls(){const id=state.tool;let html='';
- if(id==='compress')html=`<p class="hint">JPEG and WebP show a live estimate after you choose quality. PNG exports remain lossless.</p><div class="form-grid">${field('Output format',`<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option><option value="image/png">PNG</option></select>`)}${field('Quality',`<input id="quality" type="range" min="10" max="100" value="82"><output id="quality-output">82</output>`)}${field('Strip metadata','<label class="check"><input id="strip" type="checkbox" checked> Remove EXIF and metadata</label>')}<div class="field"><label>Live output estimate</label><output id="size-estimate" class="mono">Choose an image to estimate</output></div></div>`;
- else if(id==='resize')html=`<div class="form-grid">${field('Mode','<select id="mode"><option value="dimensions">Dimensions</option><option value="percentage">Percentage</option><option value="fit">Fit within preset</option></select>')}${field('Width','<input id="width" type="number" min="1" value="1200">')}${field('Height','<input id="height" type="number" min="1" value="800">')}${field('Percentage','<input id="value" type="number" min="1" max="400" value="50">')}${field('Preset','<select id="preset"><option value="1200x1200">Square 1200</option><option value="1920x1080">HD 1920×1080</option><option value="2048x2048">Shopify 2048</option></select>')}</div>`;
- else if(id==='crop')html=`<p class="hint">Drag the crop frame in the preview, or enter source pixels precisely.</p><div class="crop-preview"><canvas id="crop-preview" width="640" height="360"></canvas></div><div class="form-grid">${field('Aspect ratio','<select id="aspect"><option value="free">Free</option><option value="1:1">1:1 square</option><option value="4:3">4:3</option><option value="16:9">16:9</option><option value="3:2">3:2</option></select>')}${field('X','<input id="x" type="number" min="0" value="0">')}${field('Y','<input id="y" type="number" min="0" value="0">')}${field('Width','<input id="width" type="number" min="1" value="800">')}${field('Height','<input id="height" type="number" min="1" value="600">')}</div>`;
- else if(id==='transform')html=`<div class="form-grid">${field('Rotation','<select id="degrees"><option value="0">0°</option><option value="90">90° clockwise</option><option value="180">180°</option><option value="270">270° clockwise</option></select>')}${field('Flip','<select id="flip"><option value="none">None</option><option value="x">Flip horizontal</option><option value="y">Flip vertical</option></select>')}</div>`;
- else if(id==='convert')html=`<div class="form-grid">${field('Output format','<select id="format"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select>')}${field('Quality','<input id="quality" type="range" min="10" max="100" value="88">')}</div>`;
- else if(id==='watermark')html=`<div class="form-grid">${field('Text watermark','<input id="text" placeholder="© Your brand">','field-wide')}${field('Image watermark','<input id="mark" type="file" accept="image/png,image/jpeg,image/webp">')}${field('Position','<select id="position"><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="center">Center</option><option value="top-right">Top right</option></select>')}${field('Opacity','<input id="opacity" type="range" min="0.1" max="1" step="0.05" value="0.55">')}${field('Scale','<input id="scale" type="range" min="0.05" max="0.6" step="0.01" value="0.2">')}</div>`;
- else html=`<p class="hint">Creates WordPress and Shopify sizes from each source image. Outputs are named with the source stem and destination suffix.</p><div class="form-grid">${field('Export family','<select id="family"><option value="all">WordPress + Shopify</option><option value="wordpress">WordPress sizes</option><option value="shopify">Shopify sizes</option></select>')}${field('Output format','<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}</div>`;
- $('#control-content').innerHTML=html; if($('#quality')){let estimateTimer;$('#quality').oninput=e=>{const o=$('#quality-output');if(o)o.value=e.target.value;clearTimeout(estimateTimer);estimateTimer=setTimeout(updateEstimate,250)};$('#format').onchange=updateEstimate;updateEstimate()} if(id==='crop')setupCropPreview(); $('#controls').hidden=!state.files.length;
+$("#isolation-text").textContent =
+  `LOCAL / ${crossOriginIsolated ? "ISOLATED" : "NON-ISOLATED"}`;
+$("#isolation-dot").parentElement.classList.add(
+  crossOriginIsolated ? "good" : "bad",
+);
+$("#dialog-isolation").textContent = String(crossOriginIsolated);
+$("#about-button").onclick = () => $("#about-dialog").showModal();
+$("#close-about").onclick = () => $("#about-dialog").close();
+$("#choose-files").onclick = () => $("#file-input").click();
+$("#choose-folder").onclick = () => $("#folder-input").click();
+$("#file-input").onchange = (e) => addFiles(e.target.files);
+$("#folder-input").onchange = (e) => addFiles(e.target.files);
+["dragenter", "dragover"].forEach((type) =>
+  $("#dropzone").addEventListener(type, (e) => {
+    e.preventDefault();
+    $("#dropzone").classList.add("drag");
+  }),
+);
+["dragleave", "drop"].forEach((type) =>
+  $("#dropzone").addEventListener(type, (e) => {
+    e.preventDefault();
+    $("#dropzone").classList.remove("drag");
+  }),
+);
+$("#dropzone").ondrop = (e) => addFiles(e.dataTransfer.files);
+$("#dropzone").onkeydown = (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    $("#file-input").click();
+  }
+};
+$("#reset-tool").onclick = () => renderControls();
+$("#run-button").onclick = () =>
+  state.running ? (state.cancel = true) : run();
+function selectTool(id) {
+  state.tool = id;
+  state.results = [];
+  $("#results").hidden = true;
+  document
+    .querySelectorAll(".tool-link")
+    .forEach((b) => b.classList.toggle("active", b.dataset.tool === id));
+  const tool = toolDefs.find((x) => x.id === id);
+  $("#tool-kicker").textContent = tool.kicker;
+  $("#tool-title").textContent = tool.title;
+  $("#tool-description").textContent = tool.description;
+  renderControls();
 }
-async function updateEstimate(){const output=$('#size-estimate');if(!output||!state.files[0]||state.running)return;output.textContent='Estimating…';try{const result=await processOne(state.files[0],{...options(),maxPixels:PRODUCT.maxPixels});output.textContent=`${Math.round(result.bytes.byteLength/1024)} KB · ${result.mime}`}catch(error){output.textContent='Unavailable'}}
-function setupCropPreview(){
-  const canvas=$('#crop-preview'), file=state.files[0]; if(!canvas||!file)return;
-  const image=new Image(); image.onload=()=>{const scale=Math.min(canvas.width/image.naturalWidth,canvas.height/image.naturalHeight), dw=image.naturalWidth*scale, dh=image.naturalHeight*scale, ox=(canvas.width-dw)/2,oy=(canvas.height-dh)/2; const ctx=canvas.getContext('2d');ctx.drawImage(image,ox,oy,dw,dh);const frame=()=>{ctx.drawImage(image,ox,oy,dw,dh);const x=Number($('#x').value)||0,y=Number($('#y').value)||0,w=Number($('#width').value)||image.naturalWidth,h=Number($('#height').value)||image.naturalHeight;ctx.fillStyle='#12203a99';ctx.fillRect(ox,oy, dw,dh);ctx.clearRect(ox+x*scale,oy+y*scale,w*scale,h*scale);ctx.drawImage(image,ox+x*scale,oy+y*scale,w*scale,h*scale,ox+x*scale,oy+y*scale,w*scale,h*scale);ctx.strokeStyle='#ffe45c';ctx.lineWidth=3;ctx.strokeRect(ox+x*scale,oy+y*scale,w*scale,h*scale);};frame();['x','y','width','height','aspect'].forEach(id=>$('#'+id)?.addEventListener('input',frame));let dragging=false,last;canvas.onpointerdown=e=>{dragging=true;last=e;canvas.setPointerCapture(e.pointerId)};canvas.onpointermove=e=>{if(!dragging)return;const scale=Math.min(canvas.width/image.naturalWidth,canvas.height/image.naturalHeight);$('#x').value=Math.max(0,Math.round(Number($('#x').value)-((last.clientX-e.clientX)/scale)));$('#y').value=Math.max(0,Math.round(Number($('#y').value)-((last.clientY-e.clientY)/scale)));last=e;frame()};canvas.onpointerup=()=>{dragging=false};};image.src=URL.createObjectURL(file);
+function addFiles(list) {
+  const incoming = [...list].filter((f) =>
+    /^image\/(jpeg|png|webp)$/.test(f.type),
+  );
+  if (!incoming.length) return;
+  state.files = [...state.files, ...incoming].slice(0, TIERS.limits.maxFiles);
+  const oversized = state.files.find((f) => f.size > PRODUCT.maxPixels * 4);
+  $("#file-summary").hidden = false;
+  $("#file-summary").innerHTML =
+    `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Nothing leaves this browser."}</span>`;
+  $("#controls").hidden = false;
+  renderControls();
 }
-function options(){
-  const id=state.tool, q=Number($('#quality')?.value||88), format=$('#format')?.value||'image/png';
-  if(id==='compress'||id==='convert') return {type:id,mime:format,quality:q/100};
-  if(id==='resize'){const mode=$('#mode').value;let w=Number($('#width').value),h=Number($('#height').value);if(mode==='fit')[w,h]=$('#preset').value.split('x').map(Number);return {type:id,mode,width:w,height:h,value:Number($('#value').value),mime:'image/png'};}
-  if(id==='crop'){let w=Number($('#width').value),h=Number($('#height').value);const aspect=$('#aspect').value;if(aspect!=='free'){const [a,b]=aspect.split(':').map(Number);h=Math.round(w*b/a);}return {type:id,x:Number($('#x').value),y:Number($('#y').value),width:w,height:h,mime:'image/png'};}
-  if(id==='transform'){const flip=$('#flip').value;return {type:id,degrees:Number($('#degrees').value),flipX:flip==='x',flipY:flip==='y',mime:'image/png'};}
-  if(id==='watermark'){const mark=$('#mark')?.files[0];return {type:id,text:$('#text').value,position:$('#position').value,opacity:Number($('#opacity').value),scale:Number($('#scale').value),imageBuffer:mark?mark.arrayBuffer():null,imageType:mark?.type,mime:'image/png'};}
-  return {type:id,mime:format,quality:q/100};
+function field(label, html, wide = "") {
+  return `<div class="field ${wide}"><label>${label}</label>${html}</div>`;
 }
-function stem(name){return name.replace(/\.[^.]+$/,'').replace(/[^a-z0-9_-]+/gi,'-').replace(/^-|-$/g,'')||'image'}
-async function processOne(file,op){const worker=new Worker('./worker.js');return new Promise((resolve,reject)=>{worker.onmessage=e=>{worker.terminate();e.data.ok?resolve(e.data):reject(new Error(e.data.error))};worker.onerror=e=>{worker.terminate();reject(e.error||new Error('Worker failed'))};Promise.resolve(op.imageBuffer).then(mark=>file.arrayBuffer().then(buffer=>{const transfers=[buffer];if(mark)transfers.push(mark);worker.postMessage({id:file.name,file:{buffer,type:file.type},operation:{...op,imageBuffer:mark}},transfers);}));});}
-function outputExtension(mime){return Object.values(MIME).find(x=>x.mime===mime)?.ext||'png'}
-async function run(){if(!state.files.length||!canUseTool(state.tool,{fileCount:state.files.length}))return; const button=$('#run-button');state.running=true;state.cancel=false;button.textContent='Cancel';state.results=[];$('#results').hidden=false;$('#result-list').innerHTML='';$('#download-zip').hidden=true; const base=options(), op={...base,maxPixels:PRODUCT.maxPixels}, outputs=[]; let done=0; const tasks=[]; for(const file of state.files){if(state.tool==='web-export'){const family=$('#family').value;for(const preset of PRODUCT.webExports.filter(x=>family==='all'||x.name.toLowerCase().startsWith(family)))tasks.push({file,op:{...op,type:'web-export',width:preset.width,height:preset.height},name:`${stem(file.name)}-${preset.suffix}`});}else tasks.push({file,op,name:stem(file.name)});} let cursor=0;const worker=async()=>{while(cursor<tasks.length&&!state.cancel){const task=tasks[cursor++];$('#run-status').textContent=`Processing ${done+1} of ${tasks.length}…`;try{const result=await processOne(task.file,task.op);outputs.push({name:`${task.name}.${outputExtension(result.mime)}`,...result,source:task.file.name});}catch(error){outputs.push({name:task.name,error:error.message,source:task.file.name})}done++;}};await Promise.all(Array.from({length:Math.min(PRODUCT.concurrency,tasks.length)},worker));state.results=outputs;renderResults();state.running=false;button.textContent='Process images';$('#run-status').textContent=state.cancel?`Cancelled after ${done} output${done===1?'':'s'}.`:`Finished ${done} output${done===1?'':'s'}.`;state.cancel=false;}
-function renderResults(){const list=$('#result-list');list.innerHTML='';const good=state.results.filter(r=>r.bytes);for(const r of state.results){const row=document.createElement('div');row.className='result-item';if(r.bytes){const url=URL.createObjectURL(new Blob([r.bytes],{type:r.mime}));state.urls.push(url);row.innerHTML=`<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${r.name}</div><div class="result-meta">${r.mime} · ${Math.round(r.bytes.byteLength/1024)} KB · ${r.width}×${r.height}</div></div><a class="btn" href="${url}" download="${r.name}">Download</a>`;}else row.innerHTML=`<div></div><div><div class="result-name">${r.source}</div><div class="error">${r.error}</div></div>`;list.append(row);}if(good.length){$('#download-zip').hidden=false;$('#download-zip').onclick=()=>downloadZip(good.map(x=>({name:x.name,bytes:x.bytes})),'pixelproof-results.zip');}}
-selectTool('compress');
+function renderControls() {
+  const id = state.tool;
+  $("#run-button").hidden = id === "background-removal";
+  if (id === "background-removal") {
+    mountBackgroundTool($("#control-content"), { files: state.files });
+    $("#controls").hidden = !state.files.length;
+    return;
+  }
+  let html = "";
+  if (id === "compress")
+    html = `<p class="hint">JPEG and WebP show a live estimate after you choose quality. PNG exports remain lossless.</p><div class="form-grid">${field("Output format", `<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option><option value="image/png">PNG</option></select>`)}${field("Quality", `<input id="quality" type="range" min="10" max="100" value="82"><output id="quality-output">82</output>`)}${field("Strip metadata", '<label class="check"><input id="strip" type="checkbox" checked> Remove EXIF and metadata</label>')}<div class="field"><label>Live output estimate</label><output id="size-estimate" class="mono">Choose an image to estimate</output></div></div>`;
+  else if (id === "resize")
+    html = `<div class="form-grid">${field("Mode", '<select id="mode"><option value="dimensions">Dimensions</option><option value="percentage">Percentage</option><option value="fit">Fit within preset</option></select>')}${field("Width", '<input id="width" type="number" min="1" value="1200">')}${field("Height", '<input id="height" type="number" min="1" value="800">')}${field("Percentage", '<input id="value" type="number" min="1" max="400" value="50">')}${field("Preset", '<select id="preset"><option value="1200x1200">Square 1200</option><option value="1920x1080">HD 1920×1080</option><option value="2048x2048">Shopify 2048</option></select>')}</div>`;
+  else if (id === "crop")
+    html = `<p class="hint">Drag the crop frame in the preview, or enter source pixels precisely.</p><div class="crop-preview"><canvas id="crop-preview" width="640" height="360"></canvas></div><div class="form-grid">${field("Aspect ratio", '<select id="aspect"><option value="free">Free</option><option value="1:1">1:1 square</option><option value="4:3">4:3</option><option value="16:9">16:9</option><option value="3:2">3:2</option></select>')}${field("X", '<input id="x" type="number" min="0" value="0">')}${field("Y", '<input id="y" type="number" min="0" value="0">')}${field("Width", '<input id="width" type="number" min="1" value="800">')}${field("Height", '<input id="height" type="number" min="1" value="600">')}</div>`;
+  else if (id === "transform")
+    html = `<div class="form-grid">${field("Rotation", '<select id="degrees"><option value="0">0°</option><option value="90">90° clockwise</option><option value="180">180°</option><option value="270">270° clockwise</option></select>')}${field("Flip", '<select id="flip"><option value="none">None</option><option value="x">Flip horizontal</option><option value="y">Flip vertical</option></select>')}</div>`;
+  else if (id === "convert")
+    html = `<div class="form-grid">${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select>')}${field("Quality", '<input id="quality" type="range" min="10" max="100" value="88">')}</div>`;
+  else if (id === "watermark")
+    html = `<div class="form-grid">${field("Text watermark", '<input id="text" placeholder="© Your brand">', "field-wide")}${field("Image watermark", '<input id="mark" type="file" accept="image/png,image/jpeg,image/webp">')}${field("Position", '<select id="position"><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="center">Center</option><option value="top-right">Top right</option></select>')}${field("Opacity", '<input id="opacity" type="range" min="0.1" max="1" step="0.05" value="0.55">')}${field("Scale", '<input id="scale" type="range" min="0.05" max="0.6" step="0.01" value="0.2">')}</div>`;
+  else
+    html = `<p class="hint">Creates WordPress and Shopify sizes from each source image. Outputs are named with the source stem and destination suffix.</p><div class="form-grid">${field("Export family", '<select id="family"><option value="all">WordPress + Shopify</option><option value="wordpress">WordPress sizes</option><option value="shopify">Shopify sizes</option></select>')}${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}</div>`;
+  $("#control-content").innerHTML = html;
+  if ($("#quality")) {
+    let estimateTimer;
+    $("#quality").oninput = (e) => {
+      const o = $("#quality-output");
+      if (o) o.value = e.target.value;
+      clearTimeout(estimateTimer);
+      estimateTimer = setTimeout(updateEstimate, 250);
+    };
+    $("#format").onchange = updateEstimate;
+    updateEstimate();
+  }
+  if (id === "crop") setupCropPreview();
+  $("#controls").hidden = !state.files.length;
+}
+async function updateEstimate() {
+  const output = $("#size-estimate");
+  if (!output || !state.files[0] || state.running) return;
+  output.textContent = "Estimating…";
+  try {
+    const result = await processOne(state.files[0], {
+      ...options(),
+      maxPixels: PRODUCT.maxPixels,
+    });
+    output.textContent = `${Math.round(result.bytes.byteLength / 1024)} KB · ${result.mime}`;
+  } catch (error) {
+    output.textContent = "Unavailable";
+  }
+}
+function setupCropPreview() {
+  const canvas = $("#crop-preview"),
+    file = state.files[0];
+  if (!canvas || !file) return;
+  const image = new Image();
+  image.onload = () => {
+    const scale = Math.min(
+        canvas.width / image.naturalWidth,
+        canvas.height / image.naturalHeight,
+      ),
+      dw = image.naturalWidth * scale,
+      dh = image.naturalHeight * scale,
+      ox = (canvas.width - dw) / 2,
+      oy = (canvas.height - dh) / 2;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, ox, oy, dw, dh);
+    const frame = () => {
+      ctx.drawImage(image, ox, oy, dw, dh);
+      const x = Number($("#x").value) || 0,
+        y = Number($("#y").value) || 0,
+        w = Number($("#width").value) || image.naturalWidth,
+        h = Number($("#height").value) || image.naturalHeight;
+      ctx.fillStyle = "#12203a99";
+      ctx.fillRect(ox, oy, dw, dh);
+      ctx.clearRect(ox + x * scale, oy + y * scale, w * scale, h * scale);
+      ctx.drawImage(
+        image,
+        ox + x * scale,
+        oy + y * scale,
+        w * scale,
+        h * scale,
+        ox + x * scale,
+        oy + y * scale,
+        w * scale,
+        h * scale,
+      );
+      ctx.strokeStyle = "#ffe45c";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(ox + x * scale, oy + y * scale, w * scale, h * scale);
+    };
+    frame();
+    ["x", "y", "width", "height", "aspect"].forEach((id) =>
+      $("#" + id)?.addEventListener("input", frame),
+    );
+    let dragging = false,
+      last;
+    canvas.onpointerdown = (e) => {
+      dragging = true;
+      last = e;
+      canvas.setPointerCapture(e.pointerId);
+    };
+    canvas.onpointermove = (e) => {
+      if (!dragging) return;
+      const scale = Math.min(
+        canvas.width / image.naturalWidth,
+        canvas.height / image.naturalHeight,
+      );
+      $("#x").value = Math.max(
+        0,
+        Math.round(Number($("#x").value) - (last.clientX - e.clientX) / scale),
+      );
+      $("#y").value = Math.max(
+        0,
+        Math.round(Number($("#y").value) - (last.clientY - e.clientY) / scale),
+      );
+      last = e;
+      frame();
+    };
+    canvas.onpointerup = () => {
+      dragging = false;
+    };
+  };
+  image.src = URL.createObjectURL(file);
+}
+function options() {
+  const id = state.tool,
+    q = Number($("#quality")?.value || 88),
+    format = $("#format")?.value || "image/png";
+  if (id === "compress" || id === "convert")
+    return { type: id, mime: format, quality: q / 100 };
+  if (id === "resize") {
+    const mode = $("#mode").value;
+    let w = Number($("#width").value),
+      h = Number($("#height").value);
+    if (mode === "fit") [w, h] = $("#preset").value.split("x").map(Number);
+    return {
+      type: id,
+      mode,
+      width: w,
+      height: h,
+      value: Number($("#value").value),
+      mime: "image/png",
+    };
+  }
+  if (id === "crop") {
+    let w = Number($("#width").value),
+      h = Number($("#height").value);
+    const aspect = $("#aspect").value;
+    if (aspect !== "free") {
+      const [a, b] = aspect.split(":").map(Number);
+      h = Math.round((w * b) / a);
+    }
+    return {
+      type: id,
+      x: Number($("#x").value),
+      y: Number($("#y").value),
+      width: w,
+      height: h,
+      mime: "image/png",
+    };
+  }
+  if (id === "transform") {
+    const flip = $("#flip").value;
+    return {
+      type: id,
+      degrees: Number($("#degrees").value),
+      flipX: flip === "x",
+      flipY: flip === "y",
+      mime: "image/png",
+    };
+  }
+  if (id === "watermark") {
+    const mark = $("#mark")?.files[0];
+    return {
+      type: id,
+      text: $("#text").value,
+      position: $("#position").value,
+      opacity: Number($("#opacity").value),
+      scale: Number($("#scale").value),
+      imageBuffer: mark ? mark.arrayBuffer() : null,
+      imageType: mark?.type,
+      mime: "image/png",
+    };
+  }
+  return { type: id, mime: format, quality: q / 100 };
+}
+function stem(name) {
+  return (
+    name
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^a-z0-9_-]+/gi, "-")
+      .replace(/^-|-$/g, "") || "image"
+  );
+}
+async function processOne(file, op) {
+  const worker = new Worker("./worker.js");
+  return new Promise((resolve, reject) => {
+    worker.onmessage = (e) => {
+      worker.terminate();
+      e.data.ok ? resolve(e.data) : reject(new Error(e.data.error));
+    };
+    worker.onerror = (e) => {
+      worker.terminate();
+      reject(e.error || new Error("Worker failed"));
+    };
+    Promise.resolve(op.imageBuffer).then((mark) =>
+      file.arrayBuffer().then((buffer) => {
+        const transfers = [buffer];
+        if (mark) transfers.push(mark);
+        worker.postMessage(
+          {
+            id: file.name,
+            file: { buffer, type: file.type },
+            operation: { ...op, imageBuffer: mark },
+          },
+          transfers,
+        );
+      }),
+    );
+  });
+}
+function outputExtension(mime) {
+  return Object.values(MIME).find((x) => x.mime === mime)?.ext || "png";
+}
+async function run() {
+  if (state.tool === "background-removal") {
+    const status = $("#run-status");
+    status.textContent = "Use the background-removal controls below.";
+    return;
+  }
+  if (
+    !state.files.length ||
+    !canUseTool(state.tool, { fileCount: state.files.length })
+  )
+    return;
+  const button = $("#run-button");
+  state.running = true;
+  state.cancel = false;
+  button.textContent = "Cancel";
+  state.results = [];
+  $("#results").hidden = false;
+  $("#result-list").innerHTML = "";
+  $("#download-zip").hidden = true;
+  const base = options(),
+    op = { ...base, maxPixels: PRODUCT.maxPixels },
+    outputs = [];
+  let done = 0;
+  const tasks = [];
+  for (const file of state.files) {
+    if (state.tool === "web-export") {
+      const family = $("#family").value;
+      for (const preset of PRODUCT.webExports.filter(
+        (x) => family === "all" || x.name.toLowerCase().startsWith(family),
+      ))
+        tasks.push({
+          file,
+          op: {
+            ...op,
+            type: "web-export",
+            width: preset.width,
+            height: preset.height,
+          },
+          name: `${stem(file.name)}-${preset.suffix}`,
+        });
+    } else tasks.push({ file, op, name: stem(file.name) });
+  }
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < tasks.length && !state.cancel) {
+      const task = tasks[cursor++];
+      $("#run-status").textContent =
+        `Processing ${done + 1} of ${tasks.length}…`;
+      try {
+        const result = await processOne(task.file, task.op);
+        outputs.push({
+          name: `${task.name}.${outputExtension(result.mime)}`,
+          ...result,
+          source: task.file.name,
+        });
+      } catch (error) {
+        outputs.push({
+          name: task.name,
+          error: error.message,
+          source: task.file.name,
+        });
+      }
+      done++;
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(PRODUCT.concurrency, tasks.length) }, worker),
+  );
+  state.results = outputs;
+  renderResults();
+  state.running = false;
+  button.textContent = "Process images";
+  $("#run-status").textContent = state.cancel
+    ? `Cancelled after ${done} output${done === 1 ? "" : "s"}.`
+    : `Finished ${done} output${done === 1 ? "" : "s"}.`;
+  state.cancel = false;
+}
+function renderResults() {
+  const list = $("#result-list");
+  list.innerHTML = "";
+  const good = state.results.filter((r) => r.bytes);
+  for (const r of state.results) {
+    const row = document.createElement("div");
+    row.className = "result-item";
+    if (r.bytes) {
+      const url = URL.createObjectURL(new Blob([r.bytes], { type: r.mime }));
+      state.urls.push(url);
+      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${r.name}</div><div class="result-meta">${r.mime} · ${Math.round(r.bytes.byteLength / 1024)} KB · ${r.width}×${r.height}</div></div><a class="btn" href="${url}" download="${r.name}">Download</a>`;
+    } else
+      row.innerHTML = `<div></div><div><div class="result-name">${r.source}</div><div class="error">${r.error}</div></div>`;
+    list.append(row);
+  }
+  if (good.length) {
+    $("#download-zip").hidden = false;
+    $("#download-zip").onclick = () =>
+      downloadZip(
+        good.map((x) => ({ name: x.name, bytes: x.bytes })),
+        "pixelproof-results.zip",
+      );
+  }
+}
+selectTool("compress");
 detectFormats();
-async function detectFormats(){
-  const canvas=document.createElement('canvas'); canvas.width=1; canvas.height=1;
-  for(const mime of Object.values(MIME).map(x=>x.mime)){const blob=await new Promise(resolve=>canvas.toBlob(resolve,mime));if(blob?.type===mime)supportedFormats.add(mime);}
-  document.querySelectorAll('select#format').forEach(select=>[...select.options].forEach(option=>{option.disabled=!supportedFormats.has(option.value);}));
+async function detectFormats() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  for (const mime of Object.values(MIME).map((x) => x.mime)) {
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime));
+    if (blob?.type === mime) supportedFormats.add(mime);
+  }
+  document.querySelectorAll("select#format").forEach((select) =>
+    [...select.options].forEach((option) => {
+      option.disabled = !supportedFormats.has(option.value);
+    }),
+  );
 }

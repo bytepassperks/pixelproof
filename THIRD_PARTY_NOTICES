@@ -1,0 +1,20 @@
+PixelProof Phase 2 model provenance
+
+EfficientSAM-Ti
+  License: Apache-2.0
+  Source: https://github.com/yformer/EfficientSAM
+  Revision: d525f622e6f640acf5a0fc37c7ca1f243da5bde0
+  Files fetched at runtime:
+    weights/efficient_sam_vitt_encoder.onnx
+    weights/efficient_sam_vitt_decoder.onnx
+
+ViTMatte-S
+  License: MIT (model card and upstream project)
+  Source: https://huggingface.co/Xenova/vitmatte-small-composition-1k
+  Revision: 6bc1297f6140f055a227b6d2cfe8c093281f35d2
+  File fetched at runtime:
+    onnx/model.onnx
+
+ONNX Runtime Web and Transformers.js are loaded at runtime from pinned
+jsDelivr package versions. Their respective licenses and notices remain
+available from their upstream package repositories.
