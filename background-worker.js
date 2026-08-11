@@ -245,6 +245,72 @@ function guidedAlpha(alpha, rgb, width, height, radius = 8, epsilon = 0.005) {
   return result;
 }
 
+function decontaminate(rgba, alpha, width, height) {
+  const output = new Uint8ClampedArray(rgba);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      const value = alpha[index];
+      if (value <= 0.05 || value >= 0.95) continue;
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      let samples = 0;
+      for (
+        let yy = Math.max(0, y - 4);
+        yy <= Math.min(height - 1, y + 4);
+        yy += 1
+      ) {
+        for (
+          let xx = Math.max(0, x - 4);
+          xx <= Math.min(width - 1, x + 4);
+          xx += 1
+        ) {
+          const other = yy * width + xx;
+          if (alpha[other] >= 0.02) continue;
+          red += rgba[other * 4];
+          green += rgba[other * 4 + 1];
+          blue += rgba[other * 4 + 2];
+          samples += 1;
+        }
+      }
+      if (!samples) continue;
+      const backgroundRed = red / samples;
+      const backgroundGreen = green / samples;
+      const backgroundBlue = blue / samples;
+      const source = index * 4;
+      output[source] = Math.max(
+        0,
+        Math.min(
+          255,
+          ((rgba[source] - (1 - value) * backgroundRed) /
+            Math.max(value, 0.08)) *
+            value,
+        ),
+      );
+      output[source + 1] = Math.max(
+        0,
+        Math.min(
+          255,
+          ((rgba[source + 1] - (1 - value) * backgroundGreen) /
+            Math.max(value, 0.08)) *
+            value,
+        ),
+      );
+      output[source + 2] = Math.max(
+        0,
+        Math.min(
+          255,
+          ((rgba[source + 2] - (1 - value) * backgroundBlue) /
+            Math.max(value, 0.08)) *
+            value,
+        ),
+      );
+    }
+  }
+  return output;
+}
+
 async function runMatte(image, trimapPixels, progress) {
   const { RawImage } = await import(TRANSFORMERS_URL);
   const rawImage = await RawImage.fromBlob(await imageToBlob(image));
@@ -299,6 +365,9 @@ async function run(data) {
   const context = output.getContext("2d");
   context.drawImage(image, 0, 0);
   const rgba = context.getImageData(0, 0, image.width, image.height);
+  if (data.cleanEdges) {
+    rgba.data.set(decontaminate(rgba.data, alpha, image.width, image.height));
+  }
   let intermediate = 0;
   for (let i = 0; i < alpha.length; i += 1) {
     const value = Math.max(0, Math.min(1, Number(alpha[i])));
