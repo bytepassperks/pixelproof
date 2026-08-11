@@ -35,8 +35,10 @@ Runtime session; no general-purpose model framework is required at runtime.
 
 ===== @jsquash/avif 2.1.1 / libavif 1.0.1 / libaom 3.7.0 =====
 The AVIF encoder is vendored under `vendor/avif/` and loaded lazily only when
-the user chooses AVIF. The JavaScript package is Apache-2.0. Its encoder
-module is built from libavif v1.0.1, which is BSD-2-Clause, and includes the
+the user chooses AVIF. The JavaScript package is Apache-2.0. Its vendored
+`encode.js` is modified only to select the single-thread encoder path for
+browser worker/CSP compatibility. Its encoder module is built from libavif
+v1.0.1, which is BSD-2-Clause, and includes the
 libaom AV1 encoder (AOMedia v3.7.0), which is BSD-2-Clause. The bundled
 encoder also carries the Alliance for Open Media Patent License 1.0 notice;
 the patent license grants a royalty-free license for Necessary Claims subject
