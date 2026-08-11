@@ -1,10 +1,13 @@
 const SIZE = 1024;
+const MODEL_MIRROR =
+  "https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev";
 const ORT_URL =
   "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.mjs";
 const TRANSFORMERS_URL =
   "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
 const MATTE_MODEL = "Xenova/vitmatte-small-composition-1k";
 const MATTE_REVISION = "6bc1297f6140f055a227b6d2cfe8c093281f35d2";
+const MATTE_MODEL_URL = `${MODEL_MIRROR}/vitmatte-small-composition-1k.onnx`;
 const MATTE_MODEL_SHA256 =
   "bf28d2e0be2c073286e88d60ad649d7123da2749a2d99133fd1098d5887e0225";
 const models = {};
@@ -20,9 +23,14 @@ function installIntegrityFetch() {
   if (integrityFetchInstalled) return;
   const originalFetch = self.fetch.bind(self);
   self.fetch = async (input, init) => {
-    const response = await originalFetch(input, init);
     const requestUrl = typeof input === "string" ? input : input.url;
-    if (!requestUrl.includes("model.onnx")) return response;
+    const modelRequest = requestUrl.includes("/onnx/model.onnx") ||
+      requestUrl.endsWith("/model.onnx");
+    const response = await originalFetch(
+      modelRequest ? MATTE_MODEL_URL : input,
+      init,
+    );
+    if (!modelRequest) return response;
     const bytes = await response.clone().arrayBuffer();
     const actual = await hexDigest(bytes);
     if (actual !== MATTE_MODEL_SHA256)
@@ -100,10 +108,11 @@ async function loadModels(config, progress) {
     models.ort = await import(ORT_URL);
     models.ort.env.wasm.wasmPaths =
       "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
-    models.ort.env.wasm.numThreads = Math.min(
-      4,
-      self.navigator.hardwareConcurrency || 4,
-    );
+    // Keep the worker path on the non-threaded WASM backend. Threaded
+    // ORT creates a blob worker at runtime, which strict CSP blocks.
+    models.ort.env.wasm.numThreads = 1;
+    models.ort.env.wasm.proxy = false;
+    models.ort.env.wasm.simd = false;
   }
   if (!models.encoder) {
     progress("Loading selector encoder…");
@@ -130,10 +139,7 @@ async function loadModels(config, progress) {
     const transformers = await import(TRANSFORMERS_URL);
     transformers.env.useBrowserCache = true;
     transformers.env.allowRemoteModels = true;
-    transformers.env.backends.onnx.wasm.numThreads = Math.min(
-      4,
-      self.navigator.hardwareConcurrency || 4,
-    );
+    transformers.env.backends.onnx.wasm.numThreads = 1;
     transformers.env.backends.onnx.wasm.proxy = false;
     models.processor = await transformers.AutoProcessor.from_pretrained(
       MATTE_MODEL,

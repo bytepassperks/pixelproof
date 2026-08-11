@@ -5,5 +5,34 @@
   "display": "standalone",
   "background_color": "#f4f0e8",
   "theme_color": "#101b2d",
-  "description": "Browser-local image tools with no uploads."
+  "description": "Browser-local image tools with no uploads.",
+  "share_target": {
+    "action": "./app.html?share-target=1",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "images",
+          "accept": ["image/*", ".heic", ".heif", ".bmp", ".gif", ".ico", ".svg"]
+        }
+      ]
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "./app.html?file-handler=1",
+      "accept": {
+        "image/jpeg": [".jpg", ".jpeg"],
+        "image/png": [".png"],
+        "image/webp": [".webp"],
+        "image/heic": [".heic", ".heif"],
+        "image/bmp": [".bmp"],
+        "image/gif": [".gif"],
+        "image/x-icon": [".ico", ".cur"],
+        "image/svg+xml": [".svg"]
+      },
+      "launch_type": "single-client"
+    }
+  ]
 }

@@ -1,4 +1,4 @@
-const CACHE = "pixelproof-shell-20260811-13";
+const CACHE = "pixelproof-shell-20260811-14";
 const SHELL = [
   "./",
   "./index.html",
@@ -43,6 +43,13 @@ self.addEventListener("activate", (event) => {
 });
 self.addEventListener("fetch", (event) => {
   const request = event.request;
+  if (
+    request.method === "POST" &&
+    new URL(request.url).pathname.endsWith("/app.html")
+  ) {
+    event.respondWith(receiveSharedFiles(request));
+    return;
+  }
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).catch(() => caches.match("./app.html")));
@@ -50,3 +57,41 @@ self.addEventListener("fetch", (event) => {
   }
   event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
 });
+
+async function receiveSharedFiles(request) {
+  const form = await request.formData();
+  const files = [...form.getAll("images")]
+    .filter((file) => file instanceof File)
+    .slice(0, 100)
+    .map((file) => ({
+      name: file.name,
+      type: file.type,
+      bytes: file.arrayBuffer(),
+    }));
+  const db = await new Promise((resolve, reject) => {
+    const open = indexedDB.open("pixelproof-recovery", 2);
+    open.onupgradeneeded = () => {
+      const database = open.result;
+      if (!database.objectStoreNames.contains("outputs"))
+        database.createObjectStore("outputs", {keyPath: "id"});
+      if (!database.objectStoreNames.contains("shared-files"))
+        database.createObjectStore("shared-files", {keyPath: "id"});
+    };
+    open.onsuccess = () => resolve(open.result);
+    open.onerror = () => reject(open.error);
+  });
+  const entries = await Promise.all(files.map(async (file) => ({
+    id: crypto.randomUUID(),
+    name: file.name,
+    type: file.type,
+    bytes: await file.bytes,
+  })));
+  await new Promise((resolve, reject) => {
+    const transaction = db.transaction("shared-files", "readwrite");
+    entries.forEach((entry) => transaction.objectStore("shared-files").put(entry));
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+  });
+  db.close();
+  return Response.redirect(new URL("./app.html?shared=1", request.url), 303);
+}

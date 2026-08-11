@@ -348,7 +348,7 @@ function initRecipes() {
 }
 function exportRecipe() {
   if (!state.recipe) return;
-  const blob = new Blob([JSON.stringify({pixelproof: 1, pipeline: {...state.recipe, kind: "recipe"}}, null, 2)], {type: "application/json"});
+  const blob = new Blob([JSON.stringify({pixelproof: 1, formatVersion: 2, recipe: {...state.recipe, kind: "recipe"}}, null, 2)], {type: "application/json"});
   const url = URL.createObjectURL(blob), link = document.createElement("a");
   link.href = url; link.download = `${stem(state.recipe.name)}.pixelproof.json`;
   document.body.append(link); link.click();
@@ -358,13 +358,15 @@ async function importRecipe(event) {
   const file = event.target.files[0];
   if (!file) return;
   try {
-    const documentData = JSON.parse(await file.text()), recipe = documentData.recipe || (documentData.pipeline?.kind === "recipe" ? documentData.pipeline : null);
-    if (documentData.pixelproof !== 1 || !recipe?.name || !Array.isArray(recipe.steps) || !recipe.steps.length) throw new Error("Not a valid PixelProof recipe file.");
+    const documentData = JSON.parse(await file.text());
+    const recipe = documentData.recipe || (documentData.pipeline?.kind === "recipe" ? documentData.pipeline : null);
+    if (documentData.pixelproof !== 1 || documentData.formatVersion !== 2 || !recipe?.name || !Array.isArray(recipe.steps) || !recipe.steps.length || recipe.steps.length > 40) throw new Error("Not a valid PixelProof recipe file.");
+    if (JSON.stringify(recipe).length > 65536) throw new Error("Recipe file is too large.");
     recipe.id = `custom-${Date.now()}`;
     recipe.name = String(recipe.name).trim().slice(0, 80);
     if (!recipe.name) throw new Error("Recipe name is empty.");
     recipe.steps.forEach((step) => {
-      if (!step?.tool || !step.operation || !toolDefs.some((tool) => tool.id === step.tool)) throw new Error("Recipe contains an unknown operation.");
+      if (!step?.tool || typeof step.label !== "string" || step.label.length > 160 || !step.operation || typeof step.operation !== "object" || Array.isArray(step.operation) || !toolDefs.some((tool) => tool.id === step.tool)) throw new Error("Recipe contains an unknown or invalid operation.");
     });
     const saved = JSON.parse(localStorage.getItem(RECIPE_KEY) || "[]");
     saved.push(recipe);
@@ -484,6 +486,42 @@ $("#choose-files").onclick = () => $("#file-input").click();
 $("#choose-folder").onclick = () => $("#folder-input").click();
 $("#file-input").onchange = (e) => addFiles(e.target.files);
 $("#folder-input").onchange = (e) => addFiles(e.target.files);
+async function consumeSharedFiles() {
+  if (!("indexedDB" in window)) return;
+  try {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open(RECOVERY_DB, 2);
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        if (!database.objectStoreNames.contains("outputs"))
+          database.createObjectStore("outputs", {keyPath: "id"});
+        if (!database.objectStoreNames.contains("shared-files"))
+          database.createObjectStore("shared-files", {keyPath: "id"});
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const entries = await new Promise((resolve, reject) => {
+      const request = db.transaction("shared-files", "readonly").objectStore("shared-files").getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    if (entries.length) {
+      const transaction = db.transaction("shared-files", "readwrite");
+      entries.forEach((entry) => transaction.objectStore("shared-files").delete(entry.id));
+      await new Promise((resolve) => { transaction.oncomplete = resolve; });
+      addFiles(entries.map((entry) => new File([entry.bytes], entry.name, {type: entry.type})));
+      $("#run-status").textContent = `${entries.length} shared image${entries.length === 1 ? "" : "s"} added.`;
+    }
+    db.close();
+  } catch {
+    $("#run-status").textContent = "Shared files could not be opened. Use Choose files instead.";
+  }
+}
+if (window.launchQueue?.setConsumer)
+  window.launchQueue.setConsumer(async ({files}) => addFiles(await Promise.all(files.map((handle) => handle.getFile()))));
+if (new URLSearchParams(location.search).has("shared"))
+  consumeSharedFiles();
 document.addEventListener("paste", (event) => {
   const files = [...(event.clipboardData?.items || [])]
     .filter((item) => item.kind === "file")
@@ -633,6 +671,41 @@ function relativePath(file) {
 function field(label, html, wide = "") {
   return `<div class="field ${wide}"><label>${label}</label>${html}</div>`;
 }
+async function inputFormatPreference(file) {
+  if (
+    !file ||
+    (!/^image\/(png|gif|bmp|x-icon|svg\+xml)/i.test(file.type) &&
+      !/\.(png|gif|bmp|ico|svg)$/i.test(file.name))
+  )
+    return null;
+  try {
+    const image = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = 96;
+    canvas.height = 96;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0, 96, 96);
+    const pixels = context.getImageData(0, 0, 96, 96).data;
+    image.close();
+    let alpha = false;
+    const colours = new Set();
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index + 3] < 255) alpha = true;
+      colours.add(
+        [
+          pixels[index] >> 4,
+          pixels[index + 1] >> 4,
+          pixels[index + 2] >> 4,
+          pixels[index + 3] >> 4,
+        ].join(","),
+      );
+      if (colours.size > 96) break;
+    }
+    return {mime: "image/png", flat: alpha || colours.size <= 96};
+  } catch {
+    return null;
+  }
+}
 function renderControls() {
   const id = state.tool;
   $("#run-button").textContent = "Process images";
@@ -651,7 +724,7 @@ function renderControls() {
   }
   let html = "";
   if (id === "compress")
-    html = `<p class="hint">JPEG and WebP show a live estimate after you choose quality. PNG exports remain lossless.</p><div class="form-grid">${field("Output format", `<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option><option value="image/png">PNG</option></select>`)}${field("Quality", `<input id="quality" type="range" min="10" max="100" value="82"><output id="quality-output">82</output>`)}${field("Strip metadata", '<label class="check"><input id="strip" type="checkbox" checked> Remove EXIF and metadata</label>')}<div class="field"><label>Live output estimate</label><output id="size-estimate" class="mono">Choose an image to estimate</output></div></div>`;
+    html = `<p class="hint">Format defaults to PNG for transparency and flat-colour art, JPEG for photographs. You can override it. PNG uses conservative palette optimisation when the source has few colours.</p><div class="form-grid">${field("Output format", `<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option><option value="image/png">PNG</option></select>`)}${field("Quality", `<input id="quality" type="range" min="10" max="100" value="82"><output id="quality-output">82</output>`)}${field("Strip metadata", '<label class="check"><input id="strip" type="checkbox" checked> Remove EXIF and metadata</label>')}<div class="field"><label>Live output estimate</label><output id="size-estimate" class="mono">Choose an image to estimate</output></div></div>`;
   else if (id === "target-size")
     html = `<p class="hint">Each image gets its own quality search. If the target is unreachable at the current dimensions, the result explains why; optionally allow a dimension reduction.</p><div class="form-grid">${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}${field("Maximum bytes", '<input id="targetBytes" type="number" min="1024" step="1024" value="200000">')}${field("When unreachable", '<label class="check"><input id="reduceDimensions" type="checkbox"> Reduce dimensions to reach the budget</label>')}</div>`;
   else if (id === "resize")
@@ -720,6 +793,16 @@ function renderControls() {
     };
     $("#format").onchange = updateEstimate;
     updateEstimate();
+    if (id === "compress" && state.files[0]) {
+      inputFormatPreference(state.files[0]).then((preference) => {
+        if (!preference || !$("#format") || $("#format").dataset.userChosen) return;
+        $("#format").value = preference.mime;
+        updateEstimate();
+      });
+      $("#format").addEventListener("change", () => {
+        $("#format").dataset.userChosen = "true";
+      }, {once: true});
+    }
   }
   if (id === "crop") setupCropPreview();
   if (id === "metadata") updateMetadata();
@@ -1137,7 +1220,7 @@ async function options() {
     q = Number($("#quality")?.value || 88),
     format = $("#format")?.value || "image/png";
   if (id === "compress" || id === "convert")
-    return { type: id, mime: format, quality: q / 100 };
+    return { type: id, mime: format, quality: q / 100, pngOptimize: format === "image/png" };
   if (id === "target-size") {
     return {type: id, mime: $("#format").value, targetBytes: Number($("#targetBytes").value), reduceDimensions: $("#reduceDimensions").checked, metadata: {mode: "strip"}};
   }
@@ -1650,7 +1733,16 @@ function renderResults() {
       const original = r.originalStats ? ` · was ${r.originalStats.width}×${r.originalStats.height}` : "";
       const sourceBytes = r.originalBytes ? ` · was ${Math.round(r.originalBytes / 1024)} KB` : "";
       const dimensions = r.width && r.height ? ` · ${r.width}×${r.height}` : "";
-      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${escapeHtml(r.name)}</div><div class="result-meta">${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB${sourceBytes}${dimensions}${original}${quality}${budget}</div></div><a class="btn" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
+      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${escapeHtml(r.name)}</div><div class="result-meta">${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB${sourceBytes}${dimensions}${original}${quality}${budget}</div></div><a class="btn" draggable="true" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
+      const download = row.querySelector("a[download]");
+      download.addEventListener("dragstart", (event) => {
+        event.dataTransfer?.setData(
+          "DownloadURL",
+          `${r.mime}:${r.name}:${url}`,
+        );
+        event.dataTransfer?.setData("text/uri-list", url);
+        event.dataTransfer.effectAllowed = "copy";
+      });
       if (r.sourcePath) row.querySelector(".result-meta").textContent += ` · ${r.sourcePath}`;
     } else {
       row.innerHTML = `<div></div><div><div class="result-name">${escapeHtml(r.sourcePath || r.source)}</div><div class="error">${escapeHtml(r.error)}</div><button class="text-button retry-result">Retry this file</button></div>`;

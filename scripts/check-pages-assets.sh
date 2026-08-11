@@ -3,6 +3,7 @@ set -euo pipefail
 
 base_url="${1:-https://pixelproof.pages.dev}"
 base_url="${base_url%/}"
+model_mirror="https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -44,6 +45,12 @@ assets=(
   pdf-worker.js
 )
 
+model_assets=(
+  "efficient-sam-vitt-encoder.onnx:24799761"
+  "efficient-sam-vitt-decoder.onnx:16565728"
+  "vitmatte-small-composition-1k.onnx:103885865"
+)
+
 for asset in "${assets[@]}"; do
   body="$tmp_dir/body"
   content_type="$(
@@ -76,4 +83,17 @@ for asset in "${assets[@]}"; do
       ;;
   esac
   printf 'ok %-24s %s\n' "$asset" "$content_type"
+done
+
+for model_spec in "${model_assets[@]}"; do
+  model="${model_spec%%:*}"
+  expected_bytes="${model_spec##*:}"
+  body="$tmp_dir/model-$model"
+  curl --fail --silent --show-error --location \
+    --output "$body" \
+    "$model_mirror/$model"
+  actual_bytes="$(wc -c < "$body")"
+  [[ "$actual_bytes" == "$expected_bytes" ]] ||
+    { echo "asset check failed: model $model is $actual_bytes bytes, expected $expected_bytes" >&2; exit 1; }
+  printf 'ok %-24s model %s bytes\n' "$model" "$actual_bytes"
 done

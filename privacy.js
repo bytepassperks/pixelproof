@@ -9,7 +9,7 @@ export const MODEL_INTEGRITY = Object.freeze({
     "84ed466ffcc5c1f8d08409bc34a23bb364ab2c15e402cb12d4335a42be0e0951",
   "efficient-sam-vitt-decoder.onnx":
     "a62f8fa5ea080447c0689418d69e58f1e83e0b7adf9c142e2bd9bcc8045c0b11",
-  "model.onnx":
+  "vitmatte-small-composition-1k.onnx":
     "bf28d2e0be2c073286e88d60ad649d7123da2749a2d99133fd1098d5887e0225",
 });
 

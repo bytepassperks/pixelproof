@@ -6,8 +6,7 @@ const MODEL_MIRROR = "https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev";
 const MODEL_CONFIG = Object.freeze({
   encoderUrl: `${MODEL_MIRROR}/efficient-sam-vitt-encoder.onnx`,
   decoderUrl: `${MODEL_MIRROR}/efficient-sam-vitt-decoder.onnx`,
-  matteUrl:
-    "https://huggingface.co/Xenova/vitmatte-small-composition-1k/resolve/6bc1297f6140f055a227b6d2cfe8c093281f35d2/onnx/model.onnx",
+  matteUrl: `${MODEL_MIRROR}/vitmatte-small-composition-1k.onnx`,
 });
 
 let current = null;

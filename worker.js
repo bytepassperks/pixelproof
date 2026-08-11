@@ -34,6 +34,16 @@ async function encodeWithMetadata(canvas, mime, quality, metadata) {
   }
   return result;
 }
+function optimizeFlatPng(canvas) {
+  const context = canvas.getContext("2d");
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  for (let index = 0; index < imageData.data.length; index += 4) {
+    imageData.data[index] = (imageData.data[index] >> 4) * 17;
+    imageData.data[index + 1] = (imageData.data[index + 1] >> 4) * 17;
+    imageData.data[index + 2] = (imageData.data[index + 2] >> 4) * 17;
+  }
+  context.putImageData(imageData, 0, 0);
+}
 function pngToIco(png, width, height) {
   const bytes = new Uint8Array(22 + png.byteLength);
   const view = new DataView(bytes.buffer);
@@ -267,7 +277,17 @@ self.onmessage = async ({data}) => {
         if (!best) throw new Error(`Could not reach ${Math.round(budget / 1024)} KB at ${width}×${height}. Lower dimensions and try again.`);
       }
       result = best;
-    } else result = await encodeWithMetadata(canvas, operation.mime || file.type || 'image/png', operation.quality, operation.metadata);
+    } else {
+      result = await encodeWithMetadata(canvas, operation.mime || file.type || 'image/png', operation.quality, operation.metadata);
+      if (operation.mime === "image/png" && operation.pngOptimize) {
+        const context = canvas.getContext("2d");
+        const original = context.getImageData(0, 0, canvas.width, canvas.height);
+        optimizeFlatPng(canvas);
+        const optimized = await encodeWithMetadata(canvas, operation.mime, operation.quality, operation.metadata);
+        context.putImageData(original, 0, 0);
+        if (optimized.bytes.byteLength < result.bytes.byteLength) result = optimized;
+      }
+    }
     if (operation.ico) {
       result = {...result, bytes: pngToIco(result.bytes, width, height), mime: 'image/x-icon'};
     }
