@@ -62,6 +62,7 @@ async function dodo(env: Env, path: string, payload: Record<string, unknown>) {
       'content-type': 'application/json',
       authorization: `Bearer ${env.DODO_API_KEY}`,
       'x-business-id': env.DODO_BUSINESS_ID,
+      'user-agent': 'PixelProof/1.0 (browser-local image tools)',
     },
     body: JSON.stringify(payload),
   });
