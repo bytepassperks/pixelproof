@@ -1,4 +1,4 @@
-const CACHE = "pixelproof-shell-20260811-12";
+const CACHE = "pixelproof-shell-20260811-13";
 const SHELL = [
   "./",
   "./index.html",
@@ -12,6 +12,7 @@ const SHELL = [
   "./background-worker.js",
   "./config.js",
   "./entitlements.js",
+  "./privacy.js",
   "./metadata.js",
   "./heic.js",
   "./registry.js",
@@ -23,6 +24,10 @@ const SHELL = [
   "./manifest.webmanifest",
   "./favicon.svg",
   "./social-preview.svg",
+  "./privacy-policy.html",
+  "./terms.html",
+  "./refunds.html",
+  "./contact.html",
   "./vendor/heic/libheif.js",
   "./vendor/heic/libheif.wasm",
   "./vendor/pdf-lib/pdf-lib.min.js",

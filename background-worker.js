@@ -5,7 +5,32 @@ const TRANSFORMERS_URL =
   "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
 const MATTE_MODEL = "Xenova/vitmatte-small-composition-1k";
 const MATTE_REVISION = "6bc1297f6140f055a227b6d2cfe8c093281f35d2";
+const MATTE_MODEL_SHA256 =
+  "bf28d2e0be2c073286e88d60ad649d7123da2749a2d99133fd1098d5887e0225";
 const models = {};
+let integrityFetchInstalled = false;
+
+function hexDigest(buffer) {
+  return crypto.subtle.digest("SHA-256", buffer).then((digest) =>
+    [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join(""),
+  );
+}
+
+function installIntegrityFetch() {
+  if (integrityFetchInstalled) return;
+  const originalFetch = self.fetch.bind(self);
+  self.fetch = async (input, init) => {
+    const response = await originalFetch(input, init);
+    const requestUrl = typeof input === "string" ? input : input.url;
+    if (!requestUrl.includes("model.onnx")) return response;
+    const bytes = await response.clone().arrayBuffer();
+    const actual = await hexDigest(bytes);
+    if (actual !== MATTE_MODEL_SHA256)
+      throw new Error("ViTMatte model integrity check failed. The model was not used.");
+    return response;
+  };
+  integrityFetchInstalled = true;
+}
 
 function integral(binary) {
   const stride = SIZE + 1;
@@ -69,6 +94,7 @@ function makeTrimap(logits, radius) {
 }
 
 async function loadModels(config, progress) {
+  installIntegrityFetch();
   if (!models.ort) {
     progress("Loading browser inference runtime…");
     models.ort = await import(ORT_URL);

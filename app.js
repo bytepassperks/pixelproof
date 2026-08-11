@@ -11,6 +11,11 @@ import { mountBackgroundTool } from "./background-removal.js";
 import { inspectMetadata } from "./metadata.js";
 import { decodeHeic, isHeic } from "./heic.js";
 import { generatePdf, imageForPdf, pdfPageSize } from "./pdf.js";
+import {
+  clearLocalData,
+  localDataSummary,
+  privacySelfTestText,
+} from "./privacy.js";
 
 const toolDefs = [
   {
@@ -427,6 +432,8 @@ toolDefs.forEach((tool) => {
 document
   .querySelectorAll("[data-brand]")
   .forEach((el) => (el.textContent = PRODUCT.brand));
+if ("serviceWorker" in navigator)
+  navigator.serviceWorker.register("./sw.js", {updateViaCache: "none"}).catch(() => {});
 document.title = `${PRODUCT.brand} — private image tools`;
 $("#isolation-text").textContent =
   `LOCAL / ${crossOriginIsolated ? "ISOLATED" : "NON-ISOLATED"}`;
@@ -438,8 +445,41 @@ $("#isolation-dot").parentElement.classList.add(
   crossOriginIsolated ? "good" : "bad",
 );
 $("#dialog-isolation").textContent = String(crossOriginIsolated);
-$("#about-button").onclick = () => $("#about-dialog").showModal();
+$("#about-button").onclick = () => {
+  $("#about-dialog").showModal();
+  renderPrivacySelfTest();
+  renderLocalData();
+};
 $("#close-about").onclick = () => $("#about-dialog").close();
+function renderPrivacySelfTest() {
+  const result = privacySelfTestText();
+  $("#privacy-test-summary").textContent = result.summary;
+  $("#privacy-resource-list").textContent = result.snapshot.resources.length
+    ? result.snapshot.resources.map((item) =>
+      `${item.allowed ? "✓" : "!"} ${item.host} · ${item.initiator}${item.bytes ? ` · ${item.bytes} bytes` : ""}`,
+    ).join("\n")
+    : "No resource timing entries are available yet.";
+}
+async function renderLocalData() {
+  const summary = await localDataSummary();
+  const format = (bytes) => bytes > 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    : `${Math.round(bytes / 1024)} KB`;
+  $("#local-data-summary").innerHTML = [
+    `<p><strong>Recovery outputs:</strong> ${format(summary.recovery)} · retained ${summary.recoveryRetention}</p>`,
+    `<p><strong>Settings, recipes, profiles, presets, task count:</strong> ${format(summary.localStorage)}</p>`,
+    `<p><strong>Background-removal models:</strong> ${format(summary.models)}</p>`,
+  ].join("");
+}
+$("#privacy-refresh").onclick = renderPrivacySelfTest;
+document.querySelectorAll("[data-clear-local]").forEach((button) => {
+  button.onclick = async () => {
+    await clearLocalData(button.dataset.clearLocal);
+    $("#local-data-status").textContent = `${button.textContent.replace("Clear ", "")} cleared from this browser.`;
+    await renderLocalData();
+  };
+});
+renderPrivacySelfTest();
 $("#choose-files").onclick = () => $("#file-input").click();
 $("#choose-folder").onclick = () => $("#folder-input").click();
 $("#file-input").onchange = (e) => addFiles(e.target.files);
@@ -523,8 +563,12 @@ function addFiles(list) {
   });
   const oversized = state.files.find((f) => f.size > PRODUCT.maxPixels * 4);
   $("#file-summary").hidden = false;
+  const entitlement = getEntitlementState();
+  const jobLimit = entitlement.tasksPerDay === Infinity
+    ? "unlimited jobs today"
+    : `${Math.max(0, entitlement.tasksPerDay - entitlement.tasksUsed)} jobs left today`;
   $("#file-summary").innerHTML =
-    `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Nothing leaves this browser."} · ${getEntitlementState().label}</span><div id="animation-warning"></div>`;
+    `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}</span><div id="animation-warning"></div>`;
   $("#controls").hidden = false;
   renderControls();
 }

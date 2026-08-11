@@ -5,5 +5,5 @@
   <text x="157" y="171" fill="#0a0a0a" font-family="Arial,sans-serif" font-size="27" font-weight="900" text-anchor="middle">PP</text>
   <text x="120" y="300" fill="#f7f5f0" font-family="Arial,sans-serif" font-size="70" font-weight="900">Compress image.</text>
   <text x="120" y="390" fill="#ffe45c" font-family="Arial,sans-serif" font-size="70" font-weight="900">Private by default.</text>
-  <text x="120" y="475" fill="#b9c7da" font-family="monospace" font-size="22">HEIC to JPG · Images to PDF · No uploads</text>
+  <text x="120" y="475" fill="#b9c7da" font-family="monospace" font-size="22">HEIC to JPG · Images to PDF · Image bytes stay local</text>
 </svg>

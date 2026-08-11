@@ -1,7 +1,7 @@
 import { canUseTool, limitMessage, recordTask } from "./entitlements.js";
 import { decodeHeic, isHeic } from "./heic.js";
+import { MODEL_CACHE, MODEL_INTEGRITY, modelName, verifyIntegrity } from "./privacy.js";
 
-const MODEL_CACHE = "pixelproof-model-cache-v1";
 const MODEL_MIRROR = "https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev";
 const MODEL_CONFIG = Object.freeze({
   encoderUrl: `${MODEL_MIRROR}/efficient-sam-vitt-encoder.onnx`,
@@ -34,7 +34,11 @@ async function cachedModel(url, onProgress) {
   const cached = await cache.match(url);
   if (cached) {
     onProgress(`Using cached model · ${new URL(url).hostname}`);
-    return cached.arrayBuffer();
+    const bytes = await cached.arrayBuffer();
+    const expected = MODEL_INTEGRITY[modelName(url)];
+    if (expected && !(await verifyIntegrity(bytes, expected)))
+      throw new Error(`Cached model integrity check failed for ${modelName(url)}. Clear the model cache and try again.`);
+    return bytes;
   }
   const response = await fetch(url);
   if (!response.ok || !response.body)
@@ -58,6 +62,9 @@ async function cachedModel(url, onProgress) {
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   });
+  const expected = MODEL_INTEGRITY[modelName(url)];
+  if (expected && !(await verifyIntegrity(bytes.buffer, expected)))
+    throw new Error(`Model integrity check failed for ${modelName(url)}. The file was not used.`);
   await cache.put(
     url,
     new Response(bytes, {

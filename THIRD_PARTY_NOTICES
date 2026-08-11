@@ -8,6 +8,9 @@ EfficientSAM-Ti
   Files fetched at runtime:
     efficient-sam-vitt-encoder.onnx
     efficient-sam-vitt-decoder.onnx
+  Runtime SHA-256:
+    efficient-sam-vitt-encoder.onnx 84ed466ffcc5c1f8d08409bc34a23bb364ab2c15e402cb12d4335a42be0e0951
+    efficient-sam-vitt-decoder.onnx a62f8fa5ea080447c0689418d69e58f1e83e0b7adf9c142e2bd9bcc8045c0b11
 
 ViTMatte-S
   License: MIT (model card and upstream project)
@@ -16,6 +19,13 @@ ViTMatte-S
   R2 mirror: https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev/vitmatte-small-composition-1k.onnx
   File fetched at runtime:
     onnx/model.onnx
+  Runtime SHA-256:
+    onnx/model.onnx bf28d2e0be2c073286e88d60ad649d7123da2749a2d99133fd1098d5887e0225
+
+The application verifies the SHA-256 values above before using the mirrored
+EfficientSAM weights. A mismatch fails closed. The ViTMatte runtime fetch is
+revision-pinned and its ONNX weight hash is recorded above; Transformers.js
+also fetches model configuration/tokenizer assets required by its model loader.
 
 ONNX Runtime Web and Transformers.js are loaded at runtime from pinned
 jsDelivr package versions. Their respective licenses and notices remain

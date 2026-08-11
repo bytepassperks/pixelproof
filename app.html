@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Compress image, resize, convert HEIC to JPG, and turn images to PDF locally in your browser. No uploads, with honest batch limits.">
+  <meta name="description" content="Compress image, resize, convert HEIC to JPG, and turn images to PDF locally in your browser. Image bytes stay local; code and models download separately.">
   <meta name="theme-color" content="#12203a">
   <link rel="canonical" href="https://pixelproof.pages.dev/app.html">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -11,9 +11,9 @@
 </head>
 <body>
   <a class="skip-link" href="#job-start">Skip to recipe and upload controls</a>
-  <header class="topbar"><a class="brand" href="./"><span class="brand-mark">PP</span><span data-brand>PixelProof</span></a><span class="privacy">LOCAL ONLY / NEVER UPLOADED</span><button class="help" id="about-button">How it works</button></header>
+  <header class="topbar"><a class="brand" href="./"><span class="brand-mark">PP</span><span data-brand>PixelProof</span></a><span class="privacy">IMAGE BYTES STAY LOCAL</span><button class="help" id="about-button">How it works</button></header>
   <main class="shell">
-    <aside class="sidebar" aria-label="Tools"><p class="eyebrow">IMAGE WORKBENCH</p><nav id="tool-nav"></nav><div class="sidebar-note"><b>PRIVATE BY DEFAULT</b><span>Your files stay in this tab. Nothing is sent to a server.</span></div></aside>
+    <aside class="sidebar" aria-label="Tools"><p class="eyebrow">IMAGE WORKBENCH</p><nav id="tool-nav"></nav><div class="sidebar-note"><b>IMAGE BYTES STAY LOCAL</b><span>The app downloads code and models; it does not upload your image data.</span></div></aside>
     <section class="workbench" id="job-start" tabindex="-1" aria-labelledby="tool-title">
       <section class="recipe-panel card" id="recipe-panel">
         <div class="control-head"><div><p class="eyebrow">START WITH THE JOB</p><h2>Recipes, not tool hunting.</h2><p class="recipe-lede">Choose a complete batch workflow, inspect every step, and change anything before you run it.</p></div><button class="text-button" id="toggle-tools">Use individual tools</button></div>
@@ -28,12 +28,9 @@
       <section class="results card" id="results" hidden><div class="control-head"><span class="eyebrow">OUTPUTS</span><div class="result-actions"><button class="btn" id="save-folder" hidden>Save to folder</button><button class="btn" id="download-zip" hidden>Download ZIP</button></div></div><div id="result-list"></div></section>
     </section>
   </main>
-  <dialog id="about-dialog"><button class="dialog-close" id="close-about" aria-label="Close">×</button><p class="eyebrow">PIXELPROOF / LOCAL RUNTIME</p><h2>Your images stay in your browser.</h2><p>Every operation runs with browser canvas APIs and Web Workers. No upload endpoint exists in this phase. Large batches use a small worker window to keep memory bounded.</p><p class="mono">crossOriginIsolated: <b id="dialog-isolation"></b></p><p><a href="./THIRD_PARTY_NOTICES" target="_blank" rel="noreferrer">Third-party notices and source licences</a></p></dialog>
-  <footer><span data-brand>PixelProof</span><span>PRIVATE IMAGE WORK / v1</span><span>NO UPLOADS · NO SERVER INFERENCE</span></footer>
+  <dialog id="about-dialog"><button class="dialog-close" id="close-about" aria-label="Close">×</button><p class="eyebrow">PIXELPROOF / LOCAL RUNTIME</p><h2>Your image bytes stay in this browser.</h2><p>PixelProof downloads its app code and, on first background-removal use, model files. Checkout and licence validation carry no image data. Image processing itself runs in your browser with canvas, Web Workers, and local libraries.</p><p class="mono">crossOriginIsolated: <b id="dialog-isolation"></b></p><section class="privacy-self-test" aria-labelledby="privacy-test-title"><h3 id="privacy-test-title">Privacy self-test</h3><p id="privacy-test-summary" role="status"></p><button class="text-button" id="privacy-refresh">Refresh requested resources</button><details><summary>Show observed requests</summary><pre id="privacy-resource-list"></pre></details><p class="hint">This browser view reports resources visible to Resource Timing. It cannot inspect request bodies. For an independent check, open DevTools → Network, filter by “Fetch/XHR”, and confirm there is no image upload.</p></section><section class="local-data-panel" aria-labelledby="local-data-title"><h3 id="local-data-title">Stored on this browser</h3><p class="hint">Completed outputs are retained for up to 24 hours for recovery. Settings, recipes, the licence state, and optional model files remain until you clear them.</p><div id="local-data-summary"></div><div class="local-data-actions"><button class="text-button" data-clear-local="recovery">Clear recovered outputs</button><button class="text-button" data-clear-local="models">Clear model cache</button><button class="text-button" data-clear-local="settings">Clear settings</button><button class="text-button" data-clear-local="licence">Clear licence</button></div><p id="local-data-status" class="mono" role="status"></p></section><p><a href="./THIRD_PARTY_NOTICES" target="_blank" rel="noreferrer">Third-party notices and source licences</a></p></dialog>
+  <footer><span data-brand>PixelProof</span><span>PRIVATE IMAGE WORK / v1</span><span>IMAGE BYTES STAY LOCAL · NO SERVER INFERENCE</span></footer>
   <script type="module" src="app.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js", {updateViaCache: "none"}).catch(() => {});
-  </script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"PixelProof","applicationCategory":"MultimediaApplication","operatingSystem":"Web browser","url":"https://pixelproof.pages.dev/","description":"Private browser-local image tools for compressing, resizing, converting HEIC to JPG, and creating PDFs without uploading files.","offers":{"@type":"Offer","price":"49","priceCurrency":"USD"},"featureList":["Compress image","Resize image","HEIC to JPG","Images to PDF","Batch folder processing"]}</script>
 </body>
 </html>

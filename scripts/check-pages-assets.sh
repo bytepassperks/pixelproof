@@ -10,6 +10,10 @@ assets=(
   index.html
   app.html
   activate.html
+  privacy-policy
+  terms
+  refunds
+  contact
   styles.css
   app.js
   activation.js
@@ -17,6 +21,7 @@ assets=(
   background-worker.js
   config.js
   entitlements.js
+  privacy.js
   landing.js
   registry.js
   worker.js

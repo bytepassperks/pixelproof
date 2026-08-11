@@ -92,7 +92,7 @@ Cross-Origin-Embedder-Policy: credentialless
 ```
 
 Browser-local image toolkit. Every image operation runs in the visitor's browser —
-files are never uploaded and no server-side image processing exists.
+image bytes are never uploaded and no server-side image processing exists. The app downloads its own code and, on first background-removal use, model files; checkout and licence validation carry no image data.
 
 Static site intended for Cloudflare Pages. Cross-origin isolation is enabled via
 `_headers` so WebAssembly can use threads.

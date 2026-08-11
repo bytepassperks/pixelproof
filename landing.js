@@ -6,6 +6,10 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js', {u
 document.querySelectorAll('[data-brand]').forEach(element => {
   element.textContent = PRODUCT.brand;
 });
+const privacyAnswer = document.querySelector('#faq details p');
+if (privacyAnswer) {
+  privacyAnswer.textContent = 'Image bytes stay in your browser. PixelProof has no image upload endpoint. The app downloads its own code and, on first background-removal use, model files. Checkout and licence validation carry no image data.';
+}
 
 const status = document.querySelector('#checkout-status');
 document.querySelectorAll('[data-checkout]').forEach(button => {
