@@ -154,8 +154,177 @@ const state = {
   cancel: false,
   faceBoxes: [],
   faceScale: {x: 1, y: 1},
+  recipe: null,
+  retryFiles: [],
 };
 const supportedFormats = new Set();
+const originalStats = new WeakMap();
+const RECIPE_KEY = "pixelproof-recipes";
+const SETTINGS_KEY = "pixelproof-tool-settings";
+const recipes = [
+  {
+    id: "web",
+    name: "Web optimizer",
+    description: "Fit wide images to 1920px, strip metadata, and export compact WebP.",
+    steps: [
+      {tool: "resize", label: "Fit within 1920×1080", operation: {type: "resize", mode: "fit", width: 1920, height: 1080, mime: "image/png"}},
+      {tool: "compress", label: "WebP at quality 82, metadata stripped", operation: {type: "compress", mime: "image/webp", quality: 0.82, metadata: {mode: "strip"}}},
+    ],
+  },
+  {
+    id: "product",
+    name: "Product photos",
+    description: "Create consistent 2000px product assets without enlarging smaller originals.",
+    steps: [
+      {tool: "resize", label: "Fit within 2000×2000", operation: {type: "resize", mode: "fit", width: 2000, height: 2000, mime: "image/png"}},
+      {tool: "compress", label: "JPEG at quality 88, metadata stripped", operation: {type: "compress", mime: "image/jpeg", quality: 0.88, metadata: {mode: "strip"}}},
+    ],
+  },
+  {
+    id: "social",
+    name: "Social pack",
+    description: "Create square, portrait, and story-ready outputs from every source.",
+    steps: [
+      {tool: "social", label: "Square 1080×1080, fit", operation: {type: "social", width: 1080, height: 1080, fill: false, mime: "image/png"}, variants: ["square"]},
+      {tool: "social", label: "Portrait 1080×1350, fit", operation: {type: "social", width: 1080, height: 1350, fill: false, mime: "image/png"}, variants: ["portrait"]},
+      {tool: "social", label: "Story 1080×1920, fit", operation: {type: "social", width: 1080, height: 1920, fill: false, mime: "image/png"}, variants: ["story"]},
+    ],
+  },
+  {
+    id: "target",
+    name: "Compress to size",
+    description: "Aim for 200 KB per image with quality search and no silent over-budget exports.",
+    steps: [
+      {tool: "target-size", label: "JPEG under 200 KB per image", operation: {type: "target-size", mime: "image/jpeg", targetBytes: 200000, reduceDimensions: true, metadata: {mode: "strip"}}},
+    ],
+  },
+  {
+    id: "responsive",
+    name: "Responsive image set",
+    description: "Emit three WebP widths for responsive websites.",
+    steps: [
+      {tool: "resize", label: "768px WebP", operation: {type: "resize", mode: "fit", width: 768, height: 768, mime: "image/webp"}, variants: ["768"]},
+      {tool: "resize", label: "1200px WebP", operation: {type: "resize", mode: "fit", width: 1200, height: 1200, mime: "image/webp"}, variants: ["1200"]},
+      {tool: "resize", label: "1920px WebP", operation: {type: "resize", mode: "fit", width: 1920, height: 1920, mime: "image/webp"}, variants: ["1920"]},
+    ],
+  },
+  {
+    id: "watermark",
+    name: "Watermark batch",
+    description: "Apply a consistent text mark to every image, then export compact JPEGs.",
+    steps: [
+      {tool: "watermark", label: "Text watermark: © Your brand", operation: {type: "watermark", text: "© Your brand", position: "bottom-right", opacity: 0.55, scale: 0.2, mime: "image/png"}},
+      {tool: "compress", label: "JPEG at quality 88, metadata stripped", operation: {type: "compress", mime: "image/jpeg", quality: 0.88, metadata: {mode: "strip"}}},
+    ],
+  },
+  {
+    id: "privacy",
+    name: "Private sharing",
+    description: "Strip camera, GPS, and software metadata; review privacy boxes before sharing.",
+    steps: [
+      {tool: "metadata", label: "Strip all metadata", operation: {type: "metadata", mime: "image/jpeg", quality: 0.92, metadata: {mode: "strip"}}},
+    ],
+    note: "Face blur remains an explicit manual review in the Face blur tool; this recipe never claims automatic face detection.",
+  },
+];
+function allRecipes() {
+  try {
+    return [...recipes, ...JSON.parse(localStorage.getItem(RECIPE_KEY) || "[]")];
+  } catch {
+    return recipes;
+  }
+}
+function initRecipes() {
+  const select = $("#recipe-select");
+  if (!select) return;
+  select.innerHTML = allRecipes().map((recipe) => `<option value="${escapeHtml(recipe.id)}">${escapeHtml(recipe.name)}</option>`).join("");
+  select.onchange = () => renderRecipe(select.value);
+  $("#recipe-run").onclick = () => runRecipe();
+  $("#recipe-save").onclick = () => saveRecipe();
+  $("#recipe-export").onclick = () => exportRecipe();
+  $("#recipe-import").onclick = () => $("#recipe-import-file").click();
+  $("#recipe-import-file").onchange = (event) => importRecipe(event);
+  $("#toggle-tools").onclick = () => {
+    $(".sidebar").scrollIntoView({behavior: "smooth", block: "start"});
+    $(".sidebar").classList.add("focus-tools");
+    setTimeout(() => $(".sidebar").classList.remove("focus-tools"), 900);
+  };
+  renderRecipe(select.value);
+}
+function exportRecipe() {
+  if (!state.recipe) return;
+  const blob = new Blob([JSON.stringify({pixelproof: 1, pipeline: {...state.recipe, kind: "recipe"}}, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob), link = document.createElement("a");
+  link.href = url; link.download = `${stem(state.recipe.name)}.pixelproof.json`;
+  document.body.append(link); link.click();
+  setTimeout(() => { link.remove(); URL.revokeObjectURL(url); }, 1000);
+}
+async function importRecipe(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    const documentData = JSON.parse(await file.text()), recipe = documentData.recipe || (documentData.pipeline?.kind === "recipe" ? documentData.pipeline : null);
+    if (documentData.pixelproof !== 1 || !recipe?.name || !Array.isArray(recipe.steps) || !recipe.steps.length) throw new Error("Not a valid PixelProof recipe file.");
+    recipe.id = `custom-${Date.now()}`;
+    recipe.name = String(recipe.name).trim().slice(0, 80);
+    if (!recipe.name) throw new Error("Recipe name is empty.");
+    recipe.steps.forEach((step) => {
+      if (!step?.tool || !step.operation || !toolDefs.some((tool) => tool.id === step.tool)) throw new Error("Recipe contains an unknown operation.");
+    });
+    const saved = JSON.parse(localStorage.getItem(RECIPE_KEY) || "[]");
+    saved.push(recipe);
+    localStorage.setItem(RECIPE_KEY, JSON.stringify(saved));
+    initRecipes();
+    $("#recipe-select").value = recipe.id;
+    renderRecipe(recipe.id);
+    $("#recipe-status").textContent = `Imported recipe “${recipe.name}”.`;
+  } catch (error) {
+    $("#recipe-status").textContent = `Recipe import failed: ${error.message}`;
+  }
+  event.target.value = "";
+}
+function renderRecipe(id) {
+  const recipe = allRecipes().find((item) => item.id === id) || recipes[0];
+  state.recipe = structuredClone(recipe);
+  try {
+    const saved = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}")[id];
+    if (saved?.steps) state.recipe.steps = saved.steps;
+  } catch {}
+  $("#recipe-steps").innerHTML = state.recipe.steps.map((step, index) => `<details class="recipe-step" open><summary><span>${index + 1}</span>${escapeHtml(step.label)}</summary><label>Operation <select data-step="${index}" class="recipe-tool">${toolDefs.map((tool) => `<option value="${tool.id}" ${tool.id === step.tool ? "selected" : ""}>${escapeHtml(tool.label)}</option>`).join("")}</select></label><textarea data-step-json="${index}" aria-label="Recipe step JSON">${escapeHtml(JSON.stringify(step.operation, null, 2))}</textarea><small>Edit the operation values as JSON, or use the individual tool for visual controls.</small></details>`).join("") + (state.recipe.note ? `<p class="hint">${escapeHtml(state.recipe.note)}</p>` : "");
+  $("#recipe-steps").querySelectorAll("[data-step-json]").forEach((area) => area.onchange = () => {
+    try {
+      const index = Number(area.dataset.stepJson);
+      state.recipe.steps[index].operation = JSON.parse(area.value);
+      state.recipe.steps[index].label = `${state.recipe.steps[index].tool} operation`;
+      const settings = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}");
+      settings[state.recipe.id] = {steps: state.recipe.steps};
+      localStorage.setItem("pixelproof-recipe-settings", JSON.stringify(settings));
+      $("#recipe-status").textContent = "Step updated.";
+    } catch {
+      $("#recipe-status").textContent = "That step is not valid JSON yet.";
+    }
+  });
+  $("#recipe-steps").querySelectorAll(".recipe-tool").forEach((select) => select.onchange = () => {
+    state.recipe.steps[Number(select.dataset.step)].tool = select.value;
+    const settings = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}");
+    settings[state.recipe.id] = {steps: state.recipe.steps};
+    localStorage.setItem("pixelproof-recipe-settings", JSON.stringify(settings));
+    $("#recipe-status").textContent = "Tool type updated. Edit its operation below.";
+  });
+}
+function saveRecipe() {
+  if (!state.recipe) return;
+  const name = window.prompt("Name this recipe", state.recipe.name);
+  if (!name?.trim()) return;
+  const custom = {...state.recipe, id: `custom-${Date.now()}`, name: name.trim().slice(0, 80)};
+  const saved = JSON.parse(localStorage.getItem(RECIPE_KEY) || "[]");
+  saved.push(custom);
+  localStorage.setItem(RECIPE_KEY, JSON.stringify(saved));
+  initRecipes();
+  $("#recipe-select").value = custom.id;
+  renderRecipe(custom.id);
+  $("#recipe-status").textContent = `Saved recipe “${custom.name}”.`;
+}
 const nav = $("#tool-nav");
 toolDefs.forEach((tool) => {
   const button = document.createElement("button");
@@ -181,6 +350,17 @@ $("#choose-files").onclick = () => $("#file-input").click();
 $("#choose-folder").onclick = () => $("#folder-input").click();
 $("#file-input").onchange = (e) => addFiles(e.target.files);
 $("#folder-input").onchange = (e) => addFiles(e.target.files);
+document.addEventListener("paste", (event) => {
+  const files = [...(event.clipboardData?.items || [])]
+    .filter((item) => item.kind === "file")
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+  if (files.length) {
+    event.preventDefault();
+    addFiles(files);
+    $("#run-status").textContent = `${files.length} pasted image${files.length === 1 ? "" : "s"} added.`;
+  }
+});
 ["dragenter", "dragover"].forEach((type) =>
   $("#dropzone").addEventListener(type, (e) => {
     e.preventDefault();
@@ -200,7 +380,12 @@ $("#dropzone").onkeydown = (e) => {
     $("#file-input").click();
   }
 };
-$("#reset-tool").onclick = () => renderControls();
+$("#reset-tool").onclick = () => {
+  const all = savedSettings();
+  delete all[state.tool];
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(all));
+  renderControls();
+};
 $("#run-button").onclick = () =>
   state.running ? (state.cancel = true) : run();
 function selectTool(id) {
@@ -221,13 +406,34 @@ function addFiles(list) {
     /^image\/(jpeg|png|webp)$/.test(f.type) || isHeic(f),
   );
   if (!incoming.length) return;
-  state.files = [...state.files, ...incoming].slice(0, getEntitlementState().maxFiles);
+  state.files = [...state.files, ...incoming];
   const oversized = state.files.find((f) => f.size > PRODUCT.maxPixels * 4);
   $("#file-summary").hidden = false;
   $("#file-summary").innerHTML =
     `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Nothing leaves this browser."} · ${getEntitlementState().label}</span>`;
   $("#controls").hidden = false;
   renderControls();
+}
+function savedSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"); } catch { return {}; }
+}
+function persistSettings() {
+  const values = {};
+  $("#control-content")?.querySelectorAll("input[id], select[id], textarea[id]").forEach((input) => {
+    if (input.type !== "file") values[input.id] = input.type === "checkbox" ? input.checked : input.value;
+  });
+  const all = savedSettings();
+  all[state.tool] = values;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(all));
+}
+function restoreSettings() {
+  const values = savedSettings()[state.tool] || {};
+  Object.entries(values).forEach(([id, value]) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    if (input.type === "checkbox") input.checked = value === true || value === "true";
+    else input.value = value;
+  });
 }
 function relativePath(file) {
   const safe = [];
@@ -291,6 +497,11 @@ function renderControls() {
   else
     html = `<p class="hint">Creates WordPress and Shopify sizes from each source image. Outputs are named with the source stem and destination suffix.</p><div class="form-grid">${field("Export family", '<select id="family"><option value="all">WordPress + Shopify</option><option value="wordpress">WordPress sizes</option><option value="shopify">Shopify sizes</option></select>')}${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}</div>`;
   $("#control-content").innerHTML = html;
+  restoreSettings();
+  $("#control-content").querySelectorAll("input[id], select[id], textarea[id]").forEach((input) => {
+    input.addEventListener("change", persistSettings);
+    input.addEventListener("input", persistSettings);
+  });
   mountPresetControls();
   if (id === "photo-editor") setupEditorPreview();
   if (id === "icon-set") $("#run-button").textContent = "Generate icon set";
@@ -783,24 +994,50 @@ function outputExtension(mime) {
   if (mime === "image/x-icon") return "ico";
   return Object.values(MIME).find((x) => x.mime === mime)?.ext || "png";
 }
-async function run() {
+async function preflight(files) {
+  const tier = getEntitlementState();
+  if (files.length > tier.maxFiles)
+    return `This batch has ${files.length} files, but ${tier.label} allows ${tier.maxFiles}. Remove these extras or upgrade: ${files.slice(tier.maxFiles).slice(0, 4).map((file) => file.name).join(", ")}${files.length - tier.maxFiles > 4 ? "…" : ""}`;
+  const oversized = [];
+  for (const file of files) {
+    if (file.size > PRODUCT.maxPixels * 4) {
+      oversized.push(file.name);
+      continue;
+    }
+    if (isHeic(file)) continue;
+    try {
+      const image = await createImageBitmap(file);
+      originalStats.set(file, {width: image.width, height: image.height});
+      if (image.width * image.height > PRODUCT.maxPixels) oversized.push(`${file.name} (${image.width}×${image.height})`);
+      image.close();
+    } catch {}
+  }
+  if (oversized.length) return `These files exceed the browser pixel limit before processing: ${oversized.join(", ")}. Resize them first or remove them from the batch.`;
+  if (!canUseTool(state.tool, {fileCount: files.length, task: true}))
+    return limitMessage(state.tool, {fileCount: files.length, task: true});
+  return "";
+}
+function uniqueName(name, used) {
+  const count = used.get(name) || 0;
+  used.set(name, count + 1);
+  if (!count) return name;
+  const dot = name.lastIndexOf(".");
+  return `${name.slice(0, dot)}-${count + 1}${name.slice(dot)}`;
+}
+async function run(runFiles = state.files) {
   if (state.tool === "background-removal") {
     const status = $("#run-status");
     status.textContent = "Use the background-removal controls below.";
     return;
   }
   if (state.tool === "face-blur") return;
-  if (
-    !state.files.length ||
-    !canUseTool(state.tool, {
-      fileCount: state.files.length,
-      task: true,
-    })
-  ) {
-    $("#run-status").textContent = limitMessage(state.tool, {
-      fileCount: state.files.length,
-      task: true,
-    });
+  if (!runFiles.length) {
+    $("#run-status").textContent = "Choose at least one image first.";
+    return;
+  }
+  const preflightMessage = await preflight(runFiles);
+  if (preflightMessage) {
+    $("#run-status").textContent = preflightMessage;
     return;
   }
   if (state.tool === "palette") {
@@ -816,12 +1053,13 @@ async function run() {
   $("#results").hidden = false;
   $("#result-list").innerHTML = "";
   $("#download-zip").hidden = true;
+  $("#save-folder").hidden = true;
   const base = await options(),
     op = { ...base, maxPixels: PRODUCT.maxPixels },
-    outputs = [];
+    outputs = [], usedNames = new Map();
   let done = 0;
   const tasks = [];
-  for (const file of state.files) {
+  for (const file of runFiles) {
     if (state.tool === "web-export") {
       const family = $("#family").value;
       for (const preset of PRODUCT.webExports.filter(
@@ -857,16 +1095,23 @@ async function run() {
       try {
         const result = await processOne(task.file, task.op);
         outputs.push({
-          name: outputName(task, result),
+          name: uniqueName(outputName(task, result), usedNames),
           ...result,
           source: task.file.name,
           sourcePath: relativePath(task.file),
+          file: task.file,
+          originalBytes: task.file.size,
+          originalStats: originalStats.get(task.file),
         });
       } catch (error) {
         outputs.push({
           name: task.name,
           error: friendlyError(error),
           source: task.file.name,
+          sourcePath: relativePath(task.file),
+          file: task.file,
+          originalBytes: task.file.size,
+          originalStats: originalStats.get(task.file),
         });
       }
       done++;
@@ -892,6 +1137,75 @@ async function run() {
       ? `Finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. See the output rows for next steps.`
       : `Finished ${done} output${done === 1 ? "" : "s"}.`;
   state.cancel = false;
+}
+async function runRecipe() {
+  const files = state.files;
+  if (!state.recipe) return;
+  if (!files.length) {
+    $("#recipe-status").textContent = "Choose files or a folder before running a recipe.";
+    return;
+  }
+  const message = await preflight(files);
+  if (message) {
+    $("#recipe-status").textContent = message;
+    return;
+  }
+  const button = $("#recipe-run");
+  button.disabled = true;
+  state.running = true;
+  state.results = [];
+  $("#results").hidden = false;
+  $("#result-list").innerHTML = "";
+  $("#download-zip").hidden = true;
+  $("#save-folder").hidden = true;
+  const outputs = [], usedNames = new Map();
+  let completed = 0;
+  try {
+    for (const file of files) {
+      try {
+      const variants = state.recipe.steps.some((step) => step.variants);
+      const branches = variants
+        ? state.recipe.steps.filter((step) => step.variants).map((step) => ({step, input: file}))
+        : [{step: null, input: file}];
+      if (variants) {
+        for (const branch of branches) {
+          let input = branch.input, result;
+          const step = branch.step;
+          result = await processOne(input, {...step.operation, maxPixels: PRODUCT.maxPixels});
+          const suffix = step.variants[0];
+          const directory = relativePath(file).split("/").slice(0, -1).join("/");
+          const name = `${stem(file.name)}-${suffix}.${outputExtension(result.mime)}`;
+          outputs.push({...result, name: uniqueName(directory ? `${directory}/${name}` : name, usedNames), source: file.name, sourcePath: relativePath(file), file, originalBytes: file.size, originalStats: originalStats.get(file)});
+        }
+      } else {
+        let input = file, result;
+        for (const step of state.recipe.steps) {
+          $("#recipe-status").textContent = `Processing ${completed + 1} of ${files.length}: ${step.label}`;
+          result = await processOne(input, {...step.operation, maxPixels: PRODUCT.maxPixels});
+          input = new File([result.bytes], `${file.name}.${outputExtension(result.mime)}`, {type: result.mime});
+        }
+        const directory = relativePath(file).split("/").slice(0, -1).join("/");
+        const name = `${stem(file.name)}-${stem(state.recipe.name)}.${outputExtension(result.mime)}`;
+        outputs.push({...result, name: uniqueName(directory ? `${directory}/${name}` : name, usedNames), source: file.name, sourcePath: relativePath(file), file, originalBytes: file.size, originalStats: originalStats.get(file)});
+      }
+      completed++;
+      } catch (error) {
+        outputs.push({source: file.name, sourcePath: relativePath(file), file, error: friendlyError(error)});
+        completed++;
+      }
+    }
+    state.results = outputs;
+    recordTask();
+    renderResults();
+    const failed = outputs.filter((result) => result.error).length;
+    const succeeded = outputs.length - failed;
+    $("#recipe-status").textContent = failed
+      ? `Recipe finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. Failed files remain below.`
+      : `Recipe complete: ${outputs.length} output${outputs.length === 1 ? "" : "s"}.`;
+  } finally {
+    state.running = false;
+    button.disabled = false;
+  }
 }
 function outputName(task, result) {
   const directory = relativePath(task.file).split("/").slice(0, -1).join("/");
@@ -930,9 +1244,14 @@ function renderResults() {
       state.urls.push(url);
       const quality = r.quality ? ` · quality ${Math.round(r.quality * 100)}%` : "";
       const budget = r.resizedForBudget ? " · dimensions reduced to hit budget" : "";
-      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${escapeHtml(r.name)}</div><div class="result-meta">${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB · ${r.width}×${r.height}${quality}${budget}</div></div><a class="btn" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
-    } else
-      row.innerHTML = `<div></div><div><div class="result-name">${escapeHtml(r.source)}</div><div class="error">${escapeHtml(r.error)}</div></div>`;
+      const original = r.originalStats ? ` · was ${r.originalStats.width}×${r.originalStats.height}` : "";
+      const sourceBytes = r.originalBytes ? ` · was ${Math.round(r.originalBytes / 1024)} KB` : "";
+      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${escapeHtml(r.name)}</div><div class="result-meta">${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB${sourceBytes} · ${r.width}×${r.height}${original}${quality}${budget}</div></div><a class="btn" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
+      if (r.sourcePath) row.querySelector(".result-meta").textContent += ` · ${r.sourcePath}`;
+    } else {
+      row.innerHTML = `<div></div><div><div class="result-name">${escapeHtml(r.sourcePath || r.source)}</div><div class="error">${escapeHtml(r.error)}</div><button class="text-button retry-result">Retry this file</button></div>`;
+      row.querySelector(".retry-result").onclick = () => r.file && run([r.file]);
+    }
     list.append(row);
   }
   if (good.length) {
@@ -942,9 +1261,36 @@ function renderResults() {
         good.map((x) => ({ name: x.name, bytes: x.bytes })),
         "pixelproof-results.zip",
       );
+    if ("showDirectoryPicker" in window) {
+      $("#save-folder").hidden = false;
+      $("#save-folder").onclick = () => saveResultsToFolder(good);
+    }
+  }
+}
+async function saveResultsToFolder(results) {
+  try {
+    const root = await window.showDirectoryPicker({mode: "readwrite"});
+    for (const result of results) {
+      const parts = result.name.split("/");
+      const filename = parts.pop();
+      let directory = root;
+      for (const part of parts) directory = await directory.getDirectoryHandle(part, {create: true});
+      const handle = await directory.getFileHandle(filename, {create: true});
+      const writable = await handle.createWritable();
+      await writable.write(result.bytes);
+      await writable.close();
+    }
+    $("#run-status").textContent = `Saved ${results.length} result${results.length === 1 ? "" : "s"} to the selected folder.`;
+    $("#recipe-status").textContent = `Saved ${results.length} result${results.length === 1 ? "" : "s"} to the selected folder.`;
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      $("#run-status").textContent = `Folder save failed: ${error.message}. Use Download ZIP instead.`;
+      $("#recipe-status").textContent = `Folder save failed: ${error.message}. Use Download ZIP instead.`;
+    }
   }
 }
 selectTool("compress");
+initRecipes();
 detectFormats();
 async function detectFormats() {
   const canvas = document.createElement("canvas");
