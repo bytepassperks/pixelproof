@@ -266,13 +266,11 @@ const recipes = [
   },
 ];
 function announce(message, kind = "") {
-  ["#run-status", "#recipe-status"].forEach((selector) => {
-    const node = $(selector);
-    if (!node) return;
-    node.textContent = message;
-    node.classList.toggle("error", kind === "error");
-    node.classList.toggle("success", kind === "success");
-  });
+  const node = $("#run-status") || $("#recipe-status");
+  if (!node) return;
+  node.textContent = message;
+  node.classList.toggle("error", kind === "error");
+  node.classList.toggle("success", kind === "success");
 }
 function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -319,7 +317,12 @@ async function restoreRecovery() {
     state.results = recent.map((item) => ({...item, bytes: item.bytes}));
     $("#results").hidden = false;
     renderResults();
-    announce(`${recent.length} completed output${recent.length === 1 ? "" : "s"} recovered from your last interrupted job.`, "success");
+    const recoveryMessage = `${recent.length} completed output${recent.length === 1 ? "" : "s"} recovered from your last interrupted job.`;
+    const status = $("#run-status") || $("#recipe-status");
+    if (status) {
+      status.textContent = recoveryMessage;
+      status.classList.add("success");
+    }
   } catch {}
 }
 function allRecipes() {
