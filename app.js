@@ -8,6 +8,8 @@ import {
   recordTask,
 } from "./entitlements.js";
 import { mountBackgroundTool } from "./background-removal.js";
+import { inspectMetadata } from "./metadata.js";
+import { decodeHeic, isHeic } from "./heic.js";
 
 const toolDefs = [
   {
@@ -17,6 +19,13 @@ const toolDefs = [
     title: "Compress without guessing.",
     description:
       "Control quality while seeing output size before you download.",
+  },
+  {
+    id: "target-size",
+    label: "Target size",
+    kicker: "TOOL / TARGET SIZE",
+    title: "Hit the byte budget.",
+    description: "Binary-search quality per image until every output fits the number you set.",
   },
   {
     id: "resize",
@@ -126,6 +135,13 @@ const toolDefs = [
     title: "Pick quality by eye.",
     description: "Compare the source and compressed result with both file sizes visible.",
   },
+  {
+    id: "metadata",
+    label: "Metadata",
+    kicker: "PRIVACY / METADATA",
+    title: "See what the file reveals.",
+    description: "Inspect camera, timestamps, software, and GPS presence before stripping or preserving selected tags.",
+  },
 ];
 toolDefs.forEach(registerTool);
 const $ = (s) => document.querySelector(s);
@@ -202,7 +218,7 @@ function selectTool(id) {
 }
 function addFiles(list) {
   const incoming = [...list].filter((f) =>
-    /^image\/(jpeg|png|webp)$/.test(f.type),
+    /^image\/(jpeg|png|webp)$/.test(f.type) || isHeic(f),
   );
   if (!incoming.length) return;
   state.files = [...state.files, ...incoming].slice(0, getEntitlementState().maxFiles);
@@ -212,6 +228,15 @@ function addFiles(list) {
     `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Nothing leaves this browser."} · ${getEntitlementState().label}</span>`;
   $("#controls").hidden = false;
   renderControls();
+}
+function relativePath(file) {
+  const safe = [];
+  for (const part of (file.webkitRelativePath || file.name).replace(/^\/+/, "").split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") { safe.pop(); continue; }
+    safe.push(part.replace(/[<>:"|?*\x00-\x1f]/g, "_"));
+  }
+  return safe.join("/") || "image";
 }
 function field(label, html, wide = "") {
   return `<div class="field ${wide}"><label>${label}</label>${html}</div>`;
@@ -235,6 +260,8 @@ function renderControls() {
   let html = "";
   if (id === "compress")
     html = `<p class="hint">JPEG and WebP show a live estimate after you choose quality. PNG exports remain lossless.</p><div class="form-grid">${field("Output format", `<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option><option value="image/png">PNG</option></select>`)}${field("Quality", `<input id="quality" type="range" min="10" max="100" value="82"><output id="quality-output">82</output>`)}${field("Strip metadata", '<label class="check"><input id="strip" type="checkbox" checked> Remove EXIF and metadata</label>')}<div class="field"><label>Live output estimate</label><output id="size-estimate" class="mono">Choose an image to estimate</output></div></div>`;
+  else if (id === "target-size")
+    html = `<p class="hint">Each image gets its own quality search. If the target is unreachable at the current dimensions, the result explains why; optionally allow a dimension reduction.</p><div class="form-grid">${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}${field("Maximum bytes", '<input id="targetBytes" type="number" min="1024" step="1024" value="200000">')}${field("When unreachable", '<label class="check"><input id="reduceDimensions" type="checkbox"> Reduce dimensions to reach the budget</label>')}</div>`;
   else if (id === "resize")
     html = `<div class="form-grid">${field("Mode", '<select id="mode"><option value="dimensions">Dimensions</option><option value="percentage">Percentage</option><option value="fit">Fit within preset</option></select>')}${field("Width", '<input id="width" type="number" min="1" value="1200">')}${field("Height", '<input id="height" type="number" min="1" value="800">')}${field("Percentage", '<input id="value" type="number" min="1" max="400" value="50">')}${field("Preset", '<select id="preset"><option value="1200x1200">Square 1200</option><option value="1920x1080">HD 1920×1080</option><option value="2048x2048">Shopify 2048</option></select>')}</div>`;
   else if (id === "crop")
@@ -259,6 +286,8 @@ function renderControls() {
     html = `<div class="form-grid">${field("Colours", '<input id="paletteCount" type="number" min="3" max="12" value="6">')}</div><div id="palette-output" class="palette-output">Run extraction to see copyable colours.</div>`;
   else if (id === "compare")
     html = `<div class="form-grid">${field("Format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}${field("Quality", '<input id="quality" type="range" min="10" max="100" value="75">')}</div><div id="compare-output" class="compare-output">Run a comparison to inspect the result.</div>`;
+  else if (id === "metadata")
+    html = `<p class="hint">Metadata is read directly from the selected file bytes. GPS is called out separately because location data can be sensitive.</p><div id="metadata-output" class="metadata-output">Choose an image to inspect.</div><div class="form-grid">${field("Export mode", '<select id="metadataMode"><option value="strip">Strip all metadata</option><option value="preserve">Keep copyright and orientation</option></select>')}</div>`;
   else
     html = `<p class="hint">Creates WordPress and Shopify sizes from each source image. Outputs are named with the source stem and destination suffix.</p><div class="form-grid">${field("Export family", '<select id="family"><option value="all">WordPress + Shopify</option><option value="wordpress">WordPress sizes</option><option value="shopify">Shopify sizes</option></select>')}${field("Output format", '<select id="format"><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select>')}</div>`;
   $("#control-content").innerHTML = html;
@@ -267,6 +296,8 @@ function renderControls() {
   if (id === "icon-set") $("#run-button").textContent = "Generate icon set";
   if (id === "palette") $("#run-button").textContent = "Extract palette";
   if (id === "compare") $("#run-button").textContent = "Compare";
+  if (id === "target-size") $("#run-button").textContent = "Hit target size";
+  if (id === "metadata") $("#run-button").textContent = "Strip / export";
   if ($("#quality")) {
     let estimateTimer;
     $("#quality").oninput = (e) => {
@@ -279,6 +310,7 @@ function renderControls() {
     updateEstimate();
   }
   if (id === "crop") setupCropPreview();
+  if (id === "metadata") updateMetadata();
   $("#controls").hidden = !state.files.length;
 }
 async function updateEstimate() {
@@ -375,7 +407,7 @@ function mountPresetControls() {
     row = document.createElement("div");
     row.id = "preset-actions";
     row.className = "preset-actions";
-    row.innerHTML = '<button class="text-button" id="save-preset">Save settings</button><select id="saved-preset"><option value="">Apply saved preset…</option></select>';
+    row.innerHTML = '<button class="text-button" id="save-preset">Save settings</button><select id="saved-preset"><option value="">Apply saved preset…</option></select><button class="text-button" id="export-preset">Export pipeline</button><button class="text-button" id="import-preset">Import pipeline</button><input id="import-preset-file" type="file" accept="application/json,.json" hidden>';
     $("#control-content").append(row);
   }
   const select = $("#saved-preset");
@@ -399,6 +431,42 @@ function mountPresetControls() {
     localStorage.setItem("pixelproof-presets", JSON.stringify(next));
     mountPresetControls();
   };
+  $("#export-preset").onclick = () => {
+    const matching = presets.filter((preset) => preset.tool === state.tool);
+    const selected = matching[Number(select.value)] || matching[matching.length - 1];
+    const payload = selected || (() => {
+      const values = {};
+      $("#control-content").querySelectorAll("input[id], select[id]").forEach((input) => {
+        if (!["saved-preset", "import-preset-file"].includes(input.id)) values[input.id] = input.type === "checkbox" ? input.checked : input.value;
+      });
+      return {name: `${state.tool} pipeline`, tool: state.tool, values};
+    })();
+    const blob = new Blob([JSON.stringify({pixelproof: 1, pipeline: payload}, null, 2)], {type: "application/json"});
+    const url = URL.createObjectURL(blob), link = document.createElement("a");
+    link.href = url; link.download = `${stem(payload.name || state.tool)}.pixelproof.json`;
+    document.body.append(link); link.click();
+    setTimeout(() => { link.remove(); URL.revokeObjectURL(url); }, 1000);
+  };
+  $("#import-preset").onclick = () => $("#import-preset-file").click();
+  $("#import-preset-file").onchange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const document = JSON.parse(await file.text());
+      const payload = document.pipeline;
+      if (document.pixelproof !== 1 || !payload?.name || !payload?.tool || !payload?.values || !toolDefs.some((tool) => tool.id === payload.tool) || typeof payload.values !== "object" || Array.isArray(payload.values)) throw new Error("Not a valid PixelProof pipeline file.");
+      payload.name = String(payload.name).trim().replace(/[^\w .-]+/g, "").slice(0, 80);
+      if (!payload.name) throw new Error("Pipeline name is empty.");
+      const next = JSON.parse(localStorage.getItem("pixelproof-presets") || "[]");
+      next.push({name: payload.name, tool: payload.tool, values: payload.values});
+      localStorage.setItem("pixelproof-presets", JSON.stringify(next));
+      if (payload.tool === state.tool) mountPresetControls();
+      $("#run-status").textContent = `Imported pipeline “${payload.name}”.`;
+    } catch (error) {
+      $("#run-status").textContent = `Pipeline import failed: ${error.message}`;
+    }
+    event.target.value = "";
+  };
   select.onchange = () => {
     const matching = presets.filter((preset) => preset.tool === state.tool);
     const preset = matching[Number(select.value)];
@@ -412,6 +480,15 @@ function mountPresetControls() {
       input.dispatchEvent(new Event("change", {bubbles: true}));
     });
   };
+}
+async function updateMetadata() {
+  const output = $("#metadata-output"), file = state.files[0];
+  if (!output || !file) return;
+  output.textContent = "Reading metadata…";
+  const metadata = await inspectMetadata(file);
+  const fields = Object.entries(metadata.fields).filter(([key]) => !["gpsOffset", "gpsCoordinates", "gps"].includes(key));
+  const coordinates = metadata.gpsCoordinates ? `<p class="metadata-warning">GPS coordinates: ${metadata.gpsCoordinates.latitude}, ${metadata.gpsCoordinates.longitude}. Strip metadata before sharing if that is not intentional.</p>` : (metadata.gps ? '<p class="metadata-warning">GPS data is present but its coordinates could not be decoded.</p>' : '<p>No GPS coordinates were found in the readable EXIF block.</p>');
+  output.innerHTML = `<p><strong>${metadata.fieldCount ? `${metadata.fieldCount} metadata field${metadata.fieldCount === 1 ? "" : "s"} found` : "No readable EXIF fields found"}</strong> · ${Math.round(metadata.bytes / 1024)} KB · ${metadata.format}</p>${coordinates}<dl>${fields.map(([key, value]) => `<dt>${key}</dt><dd>${String(value)}</dd>`).join("")}</dl>`;
 }
 function editorOperation() {
   return {
@@ -550,12 +627,19 @@ async function runPalette() {
   $("#download-palette").onclick = () => { const url = URL.createObjectURL(new Blob([hex.join("\n")], {type: "text/plain"})); const link = document.createElement("a"); link.href = url; link.download = `${stem(file.name)}-palette.txt`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 500); };
   recordTask();
 }
-function options() {
+async function options() {
   const id = state.tool,
     q = Number($("#quality")?.value || 88),
     format = $("#format")?.value || "image/png";
   if (id === "compress" || id === "convert")
     return { type: id, mime: format, quality: q / 100 };
+  if (id === "target-size") {
+    return {type: id, mime: $("#format").value, targetBytes: Number($("#targetBytes").value), reduceDimensions: $("#reduceDimensions").checked, metadata: {mode: "strip"}};
+  }
+  if (id === "metadata") {
+    const metadata = await inspectMetadata(state.files[0]);
+    return {type: "metadata", mime: "image/jpeg", quality: 0.92, metadata: {mode: $("#metadataMode").value, ...metadata.fields}};
+  }
   if (id === "resize") {
     const mode = $("#mode").value;
     let w = Number($("#width").value),
@@ -649,7 +733,12 @@ function stem(name) {
   );
 }
 async function processOne(file, op) {
-  const worker = new Worker("./worker.js");
+  let input = file;
+  if (isHeic(file)) {
+    const decoded = await decodeHeic(file, (message) => { $("#run-status").textContent = message; });
+    input = new File([decoded.buffer], `${file.name}.png`, {type: "image/png"});
+  }
+  const worker = new Worker("./worker.js", {type: "module"});
   return new Promise((resolve, reject) => {
     worker.onmessage = (e) => {
       worker.terminate();
@@ -660,13 +749,13 @@ async function processOne(file, op) {
       reject(e.error || new Error("Worker failed"));
     };
     Promise.resolve(op.imageBuffer).then((mark) =>
-      file.arrayBuffer().then((buffer) => {
+      input.arrayBuffer().then((buffer) => {
         const transfers = [buffer];
         if (mark) transfers.push(mark);
         worker.postMessage(
           {
             id: file.name,
-            file: { buffer, type: file.type },
+            file: { buffer, type: input.type },
             operation: { ...op, imageBuffer: mark },
           },
           transfers,
@@ -712,7 +801,7 @@ async function run() {
   $("#results").hidden = false;
   $("#result-list").innerHTML = "";
   $("#download-zip").hidden = true;
-  const base = options(),
+  const base = await options(),
     op = { ...base, maxPixels: PRODUCT.maxPixels },
     outputs = [];
   let done = 0;
@@ -756,6 +845,7 @@ async function run() {
           name: outputName(task, result),
           ...result,
           source: task.file.name,
+          sourcePath: relativePath(task.file),
         });
       } catch (error) {
         outputs.push({
@@ -785,19 +875,21 @@ async function run() {
   state.cancel = false;
 }
 function outputName(task, result) {
-  if (state.tool !== "rename") return `${task.name}.${outputExtension(result.mime)}`;
+  const directory = relativePath(task.file).split("/").slice(0, -1).join("/");
+  const joinPath = (name) => directory ? `${directory}/${name}` : name;
+  if (state.tool !== "rename") return joinPath(`${task.name}.${outputExtension(result.mime)}`);
   const pattern = $("#pattern").value || "{prefix}-{seq}-{stem}";
   const prefix = ($("#prefix").value || "export").replace(/[^a-z0-9_-]+/gi, "-");
   const padding = Math.max(1, Number($("#padding").value) || 3);
   const sequence = String(task.sequence || 1).padStart(padding, "0");
   const date = new Date().toISOString().slice(0, 10);
-  return pattern
+  return joinPath(pattern
     .replaceAll("{prefix}", prefix)
     .replaceAll("{stem}", stem(task.file.name))
     .replaceAll("{seq}", sequence)
     .replaceAll("{width}", String(result.width))
     .replaceAll("{height}", String(result.height))
-    .replaceAll("{date}", date) + `.${outputExtension(result.mime)}`;
+    .replaceAll("{date}", date) + `.${outputExtension(result.mime)}`);
 }
 function renderCompare(result) {
   const output = $("#compare-output");
@@ -817,7 +909,9 @@ function renderResults() {
     if (r.bytes) {
       const url = URL.createObjectURL(new Blob([r.bytes], { type: r.mime }));
       state.urls.push(url);
-      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${r.name}</div><div class="result-meta">${r.mime} · ${Math.round(r.bytes.byteLength / 1024)} KB · ${r.width}×${r.height}</div></div><a class="btn" href="${url}" download="${r.name}">Download</a>`;
+      const quality = r.quality ? ` · quality ${Math.round(r.quality * 100)}%` : "";
+      const budget = r.resizedForBudget ? " · dimensions reduced to hit budget" : "";
+      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${r.name}</div><div class="result-meta">${r.mime} · ${Math.round(r.bytes.byteLength / 1024)} KB · ${r.width}×${r.height}${quality}${budget}</div></div><a class="btn" href="${url}" download="${r.name}">Download</a>`;
     } else
       row.innerHTML = `<div></div><div><div class="result-name">${r.source}</div><div class="error">${r.error}</div></div>`;
     list.append(row);

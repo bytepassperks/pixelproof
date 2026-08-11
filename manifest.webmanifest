@@ -1,0 +1,9 @@
+{
+  "name": "PixelProof — private image tools",
+  "short_name": "PixelProof",
+  "start_url": "./app.html",
+  "display": "standalone",
+  "background_color": "#f4f0e8",
+  "theme_color": "#101b2d",
+  "description": "Browser-local image tools with no uploads."
+}

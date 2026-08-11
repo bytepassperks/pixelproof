@@ -1,6 +1,8 @@
 import {PRODUCT} from './config.js';
 import {getLicenseKey, getEntitlementState, setLicenseKey, setLicenseState, LICENSE_API_URL} from './entitlements.js';
 
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js', {updateViaCache: 'none'}).catch(() => {});
+
 document.querySelectorAll('[data-brand]').forEach(element => {
   element.textContent = PRODUCT.brand;
 });

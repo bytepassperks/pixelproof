@@ -10,6 +10,18 @@ blur, favicon and app-icon sets, social presets, bulk naming, palette
 extraction, compression comparison, saved local presets, web exports, and
 prompted background removal. Face blur intentionally requires box review and
 explicit confirmation before export; it does not claim automatic detection.
+Target-size compression searches quality independently per image and reports
+the achieved bytes and quality. The Metadata tool reads EXIF locally, calls
+out GPS coordinates, and can strip all metadata or preserve copyright and
+orientation in JPEG output. Folder inputs retain safe relative paths in ZIP
+exports, and named saved settings can be exported/imported as JSON pipeline
+files. The app shell is installable and cacheable for offline workbench use;
+first-use model downloads still need a network connection.
+HEIC/HEIF photos are accepted as input across the workbench. They are decoded
+locally in a separately loaded worker using the unmodified LGPL libheif/libde265
+WASM module, then enter the ordinary browser-local image pipeline; HEIC is not
+encoded. Full attribution and licence text are available in
+`THIRD_PARTY_NOTICES` and from the workbench's runtime dialog.
 
 ## Phase 3 architecture
 

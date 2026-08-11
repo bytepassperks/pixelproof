@@ -5,6 +5,7 @@
   <meta name="description" content="Private browser-local image tools for serious batches.">
   <title>Private browser image tools</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
   <header class="topbar"><a class="brand" href="./"><span class="brand-mark">PP</span><span data-brand>PixelProof</span></a><span class="privacy">LOCAL ONLY / NEVER UPLOADED</span><button class="help" id="about-button">How it works</button></header>
@@ -12,14 +13,17 @@
     <aside class="sidebar" aria-label="Tools"><p class="eyebrow">IMAGE WORKBENCH</p><nav id="tool-nav"></nav><div class="sidebar-note"><b>PRIVATE BY DEFAULT</b><span>Your files stay in this tab. Nothing is sent to a server.</span></div></aside>
     <section class="workbench">
       <div class="heading"><div><p class="eyebrow" id="tool-kicker">TOOL / COMPRESS</p><h1 id="tool-title">Compress without guessing.</h1><p id="tool-description">Control quality while seeing the output size before you download.</p></div><div class="isolation"><span id="isolation-dot"></span><span id="isolation-text">Checking local runtime…</span></div></div>
-      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose images"><div class="drop-icon">＋</div><h2>Drop images here</h2><p>or choose files / a folder</p><div class="drop-actions"><button class="btn primary" id="choose-files">Choose files</button><button class="btn" id="choose-folder">Choose folder</button></div><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><input id="folder-input" type="file" accept="image/jpeg,image/png,image/webp" webkitdirectory multiple hidden><small>JPEG · PNG · WebP · batch-ready</small></div>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose images"><div class="drop-icon">＋</div><h2>Drop images here</h2><p>or choose files / a folder</p><div class="drop-actions"><button class="btn primary" id="choose-files">Choose files</button><button class="btn" id="choose-folder">Choose folder</button></div><input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple hidden><input id="folder-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" webkitdirectory multiple hidden><small>JPEG · PNG · WebP · HEIC/HEIF · batch-ready</small></div>
       <div id="file-summary" class="file-summary" hidden></div>
       <section class="controls card" id="controls" hidden><div class="control-head"><span class="eyebrow">OPERATION SET</span><button class="text-button" id="reset-tool">Reset</button></div><div id="control-content"></div><div class="run-row"><button class="btn primary" id="run-button">Process images</button><span id="run-status" role="status"></span></div></section>
       <section class="results card" id="results" hidden><div class="control-head"><span class="eyebrow">OUTPUTS</span><button class="btn" id="download-zip" hidden>Download ZIP</button></div><div id="result-list"></div></section>
     </section>
   </main>
-  <dialog id="about-dialog"><button class="dialog-close" id="close-about" aria-label="Close">×</button><p class="eyebrow">PIXELPROOF / LOCAL RUNTIME</p><h2>Your images stay in your browser.</h2><p>Every operation runs with browser canvas APIs and Web Workers. No upload endpoint exists in this phase. Large batches use a small worker window to keep memory bounded.</p><p class="mono">crossOriginIsolated: <b id="dialog-isolation"></b></p></dialog>
+  <dialog id="about-dialog"><button class="dialog-close" id="close-about" aria-label="Close">×</button><p class="eyebrow">PIXELPROOF / LOCAL RUNTIME</p><h2>Your images stay in your browser.</h2><p>Every operation runs with browser canvas APIs and Web Workers. No upload endpoint exists in this phase. Large batches use a small worker window to keep memory bounded.</p><p class="mono">crossOriginIsolated: <b id="dialog-isolation"></b></p><p><a href="./THIRD_PARTY_NOTICES" target="_blank" rel="noreferrer">Third-party notices and source licences</a></p></dialog>
   <footer><span data-brand>PixelProof</span><span>PRIVATE IMAGE WORK / v1</span><span>NO UPLOADS · NO SERVER INFERENCE</span></footer>
   <script type="module" src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js", {updateViaCache: "none"}).catch(() => {});
+  </script>
 </body>
 </html>

@@ -9,6 +9,7 @@
 .tool-preview{display:block;width:100%;max-height:520px;object-fit:contain;background:var(--navy);margin:0 0 18px;border:2px solid var(--ink)}
 .editor-grid{margin-top:12px}
 .preset-actions{align-items:center;border-top:1px solid var(--line);display:flex;gap:12px;margin-top:18px;padding-top:14px}
+.metadata-output{background:#f4f0e8;border:2px solid var(--ink);margin:16px 0;padding:16px}.metadata-output dl{display:grid;gap:6px;grid-template-columns:minmax(130px,180px) 1fr;margin:14px 0 0}.metadata-output dt{font:11px ui-monospace,monospace;text-transform:uppercase}.metadata-output dd{font:16px Georgia,serif;margin:0;overflow-wrap:anywhere}.metadata-warning{background:var(--yellow);border:2px solid var(--ink);font-weight:700;padding:10px}
 .preset-actions select{border:2px solid var(--ink);padding:7px;min-width:180px}
 .snippet-box,.palette-output,.compare-output{background:#eef1f5;border:2px solid var(--navy);font:12px/1.5 ui-monospace,monospace;margin-top:16px;overflow-wrap:anywhere;padding:14px;white-space:pre-wrap}
 .palette-output{display:flex;flex-wrap:wrap;gap:10px}

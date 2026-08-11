@@ -1,3 +1,5 @@
+import { injectJpegExif } from "./metadata.js";
+
 function fitWithin(width, height, maxWidth, maxHeight) {
   const scale = Math.min(maxWidth / width, maxHeight / height, 1);
   return {width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale))};
@@ -23,6 +25,14 @@ async function decode(buffer, type) { return createImageBitmap(new Blob([buffer]
 async function encode(canvas, mime, quality) {
   const blob = await canvas.convertToBlob({type: mime, quality});
   return {bytes: await blob.arrayBuffer(), mime: blob.type, width: canvas.width, height: canvas.height};
+}
+async function encodeWithMetadata(canvas, mime, quality, metadata) {
+  const result = await encode(canvas, mime, quality);
+  if (mime && result.mime !== mime) throw new Error(`The browser could not encode ${mime} without falling back to ${result.mime}.`);
+  if (result.mime === "image/jpeg" && metadata?.mode === "preserve") {
+    result.bytes = injectJpegExif(result.bytes, metadata);
+  }
+  return result;
 }
 function pngToIco(png, width, height) {
   const bytes = new Uint8Array(22 + png.byteLength);
@@ -186,7 +196,7 @@ self.onmessage = async ({data}) => {
         out.drawImage(mark, x, y, markWidth, markHeight); out.restore(); mark.close();
       }
       watermark(out, operation, width, height);
-    } else if (operation.type === 'resize' || operation.type === 'web-export' || operation.type === 'social' || operation.type === 'icon-set') {
+    } else if (operation.type === 'resize' || operation.type === 'web-export' || operation.type === 'social' || operation.type === 'icon-set' || operation.type === 'target-size') {
       if (operation.mime === 'image/jpeg') { out.fillStyle = '#fff'; out.fillRect(0, 0, width, height); }
       if (operation.fill || operation.type === 'web-export' || (operation.type === 'resize' && operation.mode !== 'fit')) drawCover(out, image, width, height);
       else drawContain(out, image, width, height);
@@ -215,7 +225,49 @@ self.onmessage = async ({data}) => {
         out.clearRect(0, 0, width, height); out.drawImage(temp, 0, 0);
       }
     }
-    let result = await encode(canvas, operation.mime || file.type || 'image/png', operation.quality);
+    let result;
+    if (operation.type === 'target-size') {
+      const budget = Math.max(1024, Number(operation.targetBytes || 0));
+      let low = 0.05, high = 1, best = null;
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const quality = (low + high) / 2;
+        const candidate = await encodeWithMetadata(canvas, operation.mime, quality, operation.metadata);
+        candidate.quality = quality;
+        if (candidate.bytes.byteLength <= budget) {
+          best = candidate;
+          low = quality;
+        } else high = quality;
+      }
+      if (!best) {
+        if (operation.reduceDimensions) {
+          let scaled = 0.9;
+          while (!best && scaled >= 0.25) {
+            const resized = new OffscreenCanvas(Math.max(1, Math.round(width * scaled)), Math.max(1, Math.round(height * scaled)));
+            const resizedContext = resized.getContext("2d");
+            resizedContext.imageSmoothingQuality = "high";
+            if (operation.mime === "image/jpeg") {
+              resizedContext.fillStyle = "#fff";
+              resizedContext.fillRect(0, 0, resized.width, resized.height);
+            }
+            resizedContext.drawImage(canvas, 0, 0, resized.width, resized.height);
+            low = 0.05; high = 1;
+            for (let attempt = 0; attempt < 12; attempt++) {
+              const quality = (low + high) / 2;
+              const candidate = await encodeWithMetadata(resized, operation.mime, quality, operation.metadata);
+              candidate.quality = quality;
+              if (candidate.bytes.byteLength <= budget) {
+                best = candidate;
+                low = quality;
+              } else high = quality;
+            }
+            if (best) best.resizedForBudget = true;
+            scaled -= 0.1;
+          }
+        }
+        if (!best) throw new Error(`Could not reach ${Math.round(budget / 1024)} KB at ${width}×${height}. Lower dimensions and try again.`);
+      }
+      result = best;
+    } else result = await encodeWithMetadata(canvas, operation.mime || file.type || 'image/png', operation.quality, operation.metadata);
     if (operation.ico) {
       result = {...result, bytes: pngToIco(result.bytes, width, height), mime: 'image/x-icon'};
     }

@@ -20,7 +20,15 @@ assets=(
   landing.js
   registry.js
   worker.js
+  heic-decoder-worker.js
   zip.js
+  metadata.js
+  heic.js
+  sw.js
+  manifest.webmanifest
+  THIRD_PARTY_NOTICES
+  vendor/heic/libheif.js
+  vendor/heic/libheif.wasm
 )
 
 for asset in "${assets[@]}"; do
@@ -36,6 +44,14 @@ for asset in "${assets[@]}"; do
         { echo "asset check failed: $asset served as $content_type" >&2; exit 1; }
       ! grep -qi '<!doctype html' "$body" ||
         { echo "asset check failed: $asset contains HTML" >&2; exit 1; }
+      ;;
+    *.webmanifest)
+      [[ "$content_type" == application/manifest+json* || "$content_type" == application/json* ]] ||
+        { echo "asset check failed: $asset served as $content_type" >&2; exit 1; }
+      ;;
+    *.wasm)
+      [[ "$content_type" == application/wasm* ]] ||
+        { echo "asset check failed: $asset served as $content_type" >&2; exit 1; }
       ;;
     *.css)
       [[ "$content_type" == text/css* ]] ||

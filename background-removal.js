@@ -1,4 +1,5 @@
 import { canUseTool, limitMessage, recordTask } from "./entitlements.js";
+import { decodeHeic, isHeic } from "./heic.js";
 
 const MODEL_CACHE = "pixelproof-model-cache-v1";
 const MODEL_MIRROR = "https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev";
@@ -119,6 +120,18 @@ export async function runBackground({ files, status, preview, controls }) {
     return;
   }
   const file = files[0];
+  let inputFile = file;
+  if (isHeic(file)) {
+    try {
+      const decoded = await decodeHeic(file, (message) => { status.textContent = message; });
+      inputFile = new File([decoded.buffer], `${file.name}.png`, {type: "image/png"});
+    } catch (error) {
+      status.textContent = error.message;
+      status.classList.add("error");
+      controls.run.disabled = false;
+      return;
+    }
+  }
   const clicks = current.clicks;
   if (!clicks.length) {
     status.textContent = "Click the subject on the image before running.";
@@ -148,12 +161,12 @@ export async function runBackground({ files, status, preview, controls }) {
       };
       current.worker.onerror = (event) =>
         reject(event.error || new Error("Background worker failed."));
-      file.arrayBuffer().then((imageBuffer) =>
+      inputFile.arrayBuffer().then((imageBuffer) =>
         current.worker.postMessage(
           {
-            id: file.name,
+            id: inputFile.name,
             imageBuffer,
-            imageType: file.type,
+            imageType: inputFile.type,
             clicks,
             bandRadius: Number(controls.band.value),
             cleanEdges: controls.clean.checked,
@@ -278,14 +291,28 @@ export function mountBackgroundTool(container, context) {
   container.append(notice, canvas, grid, row);
   const file = context.files[0];
   if (file) {
-    const image = new Image();
-    image.onload = () => {
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      canvas.getContext("2d").drawImage(image, 0, 0);
-      URL.revokeObjectURL(image.src);
+    const drawSource = (source) => {
+      const image = new Image();
+      image.onload = () => {
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        canvas.getContext("2d").drawImage(image, 0, 0);
+        URL.revokeObjectURL(image.src);
+      };
+      image.src = URL.createObjectURL(source);
     };
-    image.src = URL.createObjectURL(file);
+    if (isHeic(file)) {
+      status.textContent = "Loading the HEIC decoder locally…";
+      decodeHeic(file).then((decoded) => {
+        drawSource(new Blob([decoded.buffer], {type: "image/png"}));
+        status.textContent = "HEIC ready. Click the subject to select it.";
+      }).catch((error) => {
+        status.textContent = error.message;
+        status.classList.add("error");
+      });
+    } else {
+      drawSource(file);
+    }
     canvas.onclick = (event) => {
       const rect = canvas.getBoundingClientRect();
       const x = Math.round(
