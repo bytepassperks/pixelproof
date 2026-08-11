@@ -89,9 +89,13 @@ for model_spec in "${model_assets[@]}"; do
   model="${model_spec%%:*}"
   expected_bytes="${model_spec##*:}"
   body="$tmp_dir/model-$model"
-  curl --fail --silent --show-error --location \
-    --output "$body" \
+  content_type="$(
+    curl --fail --silent --show-error --location \
+      --output "$body" --write-out '%{content_type}' \
     "$model_mirror/$model"
+  )"
+  [[ "$content_type" != text/html* ]] ||
+    { echo "asset check failed: model $model returned HTML" >&2; exit 1; }
   actual_bytes="$(wc -c < "$body")"
   [[ "$actual_bytes" == "$expected_bytes" ]] ||
     { echo "asset check failed: model $model is $actual_bytes bytes, expected $expected_bytes" >&2; exit 1; }
