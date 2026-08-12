@@ -130,6 +130,8 @@ body{background:var(--darkroom);color:var(--paper)}
 .app-shell .isolation{color:var(--paper-dim)}.app-shell .isolation span:first-child{background:var(--amber);border-radius:0}
 .app-shell .recipe-panel,.app-shell .card{background:var(--sleeve);border:1px solid var(--rule);box-shadow:none;color:var(--paper)}
 .app-shell .recipe-panel{border-left:3px solid var(--amber);margin-top:0;padding:26px 28px 24px}
+.app-shell .btn.primary{box-shadow:none}
+.app-shell .btn:focus-visible{box-shadow:none!important;outline:2px solid var(--amber-bright);outline-offset:3px}
 .app-shell .workbench{display:flex;flex-direction:column}
 .app-shell .workbench>.heading{order:1}
 .app-shell .workbench>.controls{order:2}
