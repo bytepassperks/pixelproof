@@ -443,3 +443,12 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
     min-height:178px
   }
 }
+@media(max-width:600px){
+  .landing .tool-cards{
+    grid-template-columns:1fr;
+    min-width:0
+  }
+  .landing .tool-cards > *{
+    min-width:0
+  }
+}
