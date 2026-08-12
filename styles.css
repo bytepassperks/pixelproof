@@ -130,6 +130,13 @@ body{background:var(--darkroom);color:var(--paper)}
 .app-shell .isolation{color:var(--paper-dim)}.app-shell .isolation span:first-child{background:var(--amber);border-radius:0}
 .app-shell .recipe-panel,.app-shell .card{background:var(--sleeve);border:1px solid var(--rule);box-shadow:none;color:var(--paper)}
 .app-shell .recipe-panel{border-left:3px solid var(--amber);margin-top:0;padding:26px 28px 24px}
+.app-shell .workbench{display:flex;flex-direction:column}
+.app-shell .workbench>.heading{order:1}
+.app-shell .workbench>.controls{order:2}
+.app-shell .workbench>.dropzone{order:3}
+.app-shell .workbench>#file-summary{order:4}
+.app-shell .workbench>.results{order:5}
+.app-shell .workbench>.recipe-panel{order:6}
 .app-shell .control-head{border-color:var(--rule);padding-bottom:16px}
 .app-shell .recipe-panel h2,.app-shell .recipe-panel .recipe-lede{font-family:var(--display-face);font-weight:700}.app-shell .recipe-panel h2{font-size:clamp(28px,3.5vw,42px);letter-spacing:-.06em}.app-shell .recipe-lede{color:var(--paper-dim);font-weight:450}
 .app-shell .recipe-panel h2{color:var(--amber-bright)}
