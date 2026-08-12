@@ -358,3 +358,40 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
     max-height:520px
   }
 }
+.landing .hero{
+  align-items:start;
+  gap:var(--space-6);
+  grid-template-columns:minmax(0,1.35fr) minmax(280px,.85fr)
+}
+.landing .trust-strip{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  justify-content:initial;
+  text-align:left
+}
+.landing .pricing-grid{
+  margin-left:0;
+  margin-right:0;
+  max-width:none
+}
+.landing .final-cta{
+  text-align:left
+}
+.landing .final-cta h2{
+  margin-left:0;
+  margin-right:0
+}
+.proof-compare-stage{
+  max-height:600px
+}
+@media(max-width:600px){
+  .landing .hero{
+    grid-template-columns:1fr
+  }
+  .landing .trust-strip{
+    display:flex
+  }
+  .proof-compare-stage{
+    max-height:420px
+  }
+}
