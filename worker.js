@@ -442,5 +442,5 @@ self.onmessage = async ({data}) => {
     }
     self.postMessage({id, ok: true, ...result}, [result.bytes]);
     image.close();
-  } catch (error) { self.postMessage({id: data.id, ok: false, error: String(error), userFacing: error?.userFacing === true}); }
+  } catch (error) { self.postMessage({id: data.id, ok: false, error: error?.message || String(error), userFacing: error?.userFacing === true}); }
 };

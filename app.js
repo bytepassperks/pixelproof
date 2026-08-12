@@ -612,7 +612,9 @@ function selectTool(id) {
   state.tool = id;
   state.results = [];
   $("#run-status").textContent = "";
-  $("#results").hidden = true;
+  $("#results").hidden = false;
+  $("#result-list").innerHTML = "";
+  setProgress(0, 0);
 document
   .querySelectorAll(".tool-link")
     .forEach((b) => {
