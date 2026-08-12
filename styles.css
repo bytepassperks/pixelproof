@@ -336,3 +336,6 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .mock-annotation{font-size:10px;line-height:1.35}
 .dropzone.drag{box-shadow:inset 0 0 0 2px var(--amber),0 0 0 1px var(--amber);}
 .landing .price-card.featured{}
+/* Upload surface keeps the focus target available without decorative empty marks. */
+.app-shell .skip-link:not(:focus){clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}
+.app-shell .dropzone::before,.app-shell .dropzone::after{display:none}
