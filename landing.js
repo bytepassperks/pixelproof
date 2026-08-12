@@ -81,5 +81,17 @@ if (compareStage && compareSlider && compareOutput) {
   });
   compareStage.addEventListener('pointerup', () => { dragging = false; });
   compareStage.addEventListener('pointercancel', () => { dragging = false; });
+  compareStage.addEventListener('touchstart', (event) => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    dragging = true;
+    updateComparison(valueFromPoint(touch));
+  }, {passive: true});
+  compareStage.addEventListener('touchmove', (event) => {
+    if (!dragging) return;
+    const touch = event.touches[0];
+    if (touch) updateComparison(valueFromPoint(touch));
+  }, {passive: true});
+  compareStage.addEventListener('touchend', () => { dragging = false; }, {passive: true});
   updateComparison(compareSlider.value);
 }
