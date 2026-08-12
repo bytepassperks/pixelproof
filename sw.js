@@ -1,10 +1,13 @@
-const CACHE = "pixelproof-shell-20260811-15";
+const CACHE = "pixelproof-shell-20260812-17";
 const SHELL = [
   "./",
   "./index.html",
   "./app.html",
   "./activate.html",
   "./styles.css",
+  "./vendor/fonts/InstrumentSerif-Latin.woff2",
+  "./vendor/fonts/JetBrainsMono-Latin.woff2",
+  "./vendor/fonts/JetBrainsMono-Bold-Latin.woff2",
   "./app.js",
   "./landing.js",
   "./activation.js",

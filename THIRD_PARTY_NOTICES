@@ -929,6 +929,18 @@ SOFTWARE.
 
 ----------------------------------------------------------------------
 
+PixelProof UI fonts
+-------------------
+
+Instrument Serif is distributed under the SIL Open Font License,
+version 1.1. JetBrains Mono is distributed under the SIL Open Font
+License, version 1.1. PixelProof vendors latin-subset WOFF2 files
+converted from the upstream TTF files with fontTools; the converted
+files are used locally by the interface under vendor/fonts/. No font
+data or third-party code was added beyond the upstream typefaces.
+
+----------------------------------------------------------------------
+
 pdf-lib 1.17.1
 
 PixelProof vendors the unmodified browser distribution of pdf-lib 1.17.1

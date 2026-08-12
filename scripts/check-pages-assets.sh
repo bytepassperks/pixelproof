@@ -16,6 +16,9 @@ assets=(
   refunds
   contact
   styles.css
+  vendor/fonts/InstrumentSerif-Latin.woff2
+  vendor/fonts/JetBrainsMono-Latin.woff2
+  vendor/fonts/JetBrainsMono-Bold-Latin.woff2
   app.js
   activation.js
   background-removal.js

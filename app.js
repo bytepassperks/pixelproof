@@ -383,6 +383,36 @@ async function importRecipe(event) {
   }
   event.target.value = "";
 }
+function operationLabel(step) {
+  const tool = toolDefs.find((item) => item.id === step.tool);
+  return tool?.label || step.tool || "Operation";
+}
+function operationControls(operation) {
+  const type = operation?.type;
+  const field = (label, key, value, kind = "text", extra = "") =>
+    `<label class="recipe-field"><span>${label}</span><input data-op="${key}" data-kind="${kind}" value="${escapeHtml(String(value ?? ""))}" ${extra}></label>`;
+  const select = (label, key, value, options) =>
+    `<label class="recipe-field"><span>${label}</span><select data-op="${key}">${options.map(([option, text]) => `<option value="${option}" ${option === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
+  if (type === "resize") return `<div class="recipe-fields">${select("Mode", "mode", operation.mode, [["fit", "Fit within"], ["exact", "Exact dimensions"], ["percent", "Percentage"]])}${field("Width", "width", operation.width, "number", 'min="1" step="1"')}${field("Height", "height", operation.height, "number", 'min="1" step="1"')}${select("Output", "mime", operation.mime, [["image/png", "PNG"], ["image/jpeg", "JPEG"], ["image/webp", "WebP"], ["image/avif", "AVIF"]])}</div>`;
+  if (type === "compress") return `<div class="recipe-fields">${select("Output", "mime", operation.mime, [["image/jpeg", "JPEG"], ["image/png", "PNG"], ["image/webp", "WebP"], ["image/avif", "AVIF"]])}${field("Quality", "quality", Math.round((operation.quality ?? 0.82) * 100), "number", 'min="1" max="100" step="1"')}<p class="recipe-control-note">Metadata: ${escapeHtml(operation.metadata?.mode || "keep")}</p></div>`;
+  if (type === "social") return `<div class="recipe-fields">${field("Width", "width", operation.width, "number", 'min="1" step="1"')}${field("Height", "height", operation.height, "number", 'min="1" step="1"')}${select("Output", "mime", operation.mime, [["image/png", "PNG"], ["image/jpeg", "JPEG"], ["image/webp", "WebP"], ["image/avif", "AVIF"]])}<label class="recipe-check"><input type="checkbox" data-op="fill" ${operation.fill ? "checked" : ""}><span>Fill the frame</span></label></div>`;
+  if (type === "target-size") return `<div class="recipe-fields">${field("Target bytes", "targetBytes", operation.targetBytes, "number", 'min="1000" step="1000"')}${select("Output", "mime", operation.mime, [["image/jpeg", "JPEG"], ["image/webp", "WebP"], ["image/avif", "AVIF"]])}<label class="recipe-check"><input type="checkbox" data-op="reduceDimensions" ${operation.reduceDimensions ? "checked" : ""}><span>Reduce dimensions if needed</span></label></div>`;
+  if (type === "watermark") return `<div class="recipe-fields">${field("Text", "text", operation.text)}${select("Position", "position", operation.position, [["bottom-right", "Bottom right"], ["bottom-left", "Bottom left"], ["top-right", "Top right"], ["top-left", "Top left"], ["center", "Center"]])}${field("Opacity", "opacity", Math.round((operation.opacity ?? 0.55) * 100), "number", 'min="1" max="100" step="1"')}${field("Scale", "scale", Math.round((operation.scale ?? 0.2) * 100), "number", 'min="1" max="100" step="1"')}</div>`;
+  if (type === "metadata") return `<div class="recipe-fields">${select("Metadata", "metadata.mode", operation.metadata?.mode || "strip", [["strip", "Strip all"], ["preserve", "Preserve"]])}${select("Output", "mime", operation.mime, [["image/jpeg", "JPEG"], ["image/png", "PNG"], ["image/webp", "WebP"]])}${field("Quality", "quality", Math.round((operation.quality ?? 0.92) * 100), "number", 'min="1" max="100" step="1"')}</div>`;
+  return `<p class="recipe-control-note">This operation uses the individual tool controls. Advanced JSON remains available below.</p>`;
+}
+function setOperationValue(operation, path, value) {
+  const parts = path.split(".");
+  const key = parts.pop();
+  let target = operation;
+  for (const part of parts) target = target[part] ||= {};
+  target[key] = value;
+}
+function persistRecipeSettings() {
+  const settings = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}");
+  settings[state.recipe.id] = {steps: state.recipe.steps};
+  localStorage.setItem("pixelproof-recipe-settings", JSON.stringify(settings));
+}
 function renderRecipe(id) {
   const recipe = allRecipes().find((item) => item.id === id) || recipes[0];
   state.recipe = structuredClone(recipe);
@@ -390,15 +420,23 @@ function renderRecipe(id) {
     const saved = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}")[id];
     if (saved?.steps) state.recipe.steps = saved.steps;
   } catch {}
-  $("#recipe-steps").innerHTML = state.recipe.steps.map((step, index) => `<details class="recipe-step" open><summary><span>${index + 1}</span>${escapeHtml(step.label)}</summary><label>Operation <select data-step="${index}" class="recipe-tool">${toolDefs.map((tool) => `<option value="${tool.id}" ${tool.id === step.tool ? "selected" : ""}>${escapeHtml(tool.label)}</option>`).join("")}</select></label><textarea data-step-json="${index}" aria-label="Recipe step JSON">${escapeHtml(JSON.stringify(step.operation, null, 2))}</textarea><small>Edit the operation values as JSON, or use the individual tool for visual controls.</small></details>`).join("") + (state.recipe.note ? `<p class="hint">${escapeHtml(state.recipe.note)}</p>` : "");
+  $("#recipe-steps").innerHTML = state.recipe.steps.map((step, index) => `<details class="recipe-step" open><summary><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(operationLabel(step))}</strong><em>${escapeHtml(step.label)}</em></summary><label class="recipe-tool-label"><span>Operation</span><select data-step="${index}" class="recipe-tool">${toolDefs.map((tool) => `<option value="${tool.id}" ${tool.id === step.tool ? "selected" : ""}>${escapeHtml(tool.label)}</option>`).join("")}</select></label>${operationControls(step.operation)}<details class="recipe-advanced"><summary>Advanced operation data</summary><textarea data-step-json="${index}" aria-label="Advanced recipe step JSON">${escapeHtml(JSON.stringify(step.operation, null, 2))}</textarea><small>Edit the underlying operation only if you need a value not shown above.</small></details></details>`).join("") + (state.recipe.note ? `<p class="hint">${escapeHtml(state.recipe.note)}</p>` : "");
+  $("#recipe-steps").querySelectorAll("[data-op]").forEach((control) => control.onchange = () => {
+    const index = Number(control.closest(".recipe-step").querySelector("[data-step]").dataset.step);
+    let value = control.type === "checkbox" ? control.checked : control.value;
+    if (control.dataset.kind === "number") value = Number(value);
+    if (["quality", "opacity", "scale"].includes(control.dataset.op)) value /= 100;
+    setOperationValue(state.recipe.steps[index].operation, control.dataset.op, value);
+    state.recipe.steps[index].label = `${operationLabel(state.recipe.steps[index])} · edited`;
+    persistRecipeSettings();
+    $("#recipe-status").textContent = "Step updated.";
+  });
   $("#recipe-steps").querySelectorAll("[data-step-json]").forEach((area) => area.onchange = () => {
     try {
       const index = Number(area.dataset.stepJson);
       state.recipe.steps[index].operation = JSON.parse(area.value);
       state.recipe.steps[index].label = `${state.recipe.steps[index].tool} operation`;
-      const settings = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}");
-      settings[state.recipe.id] = {steps: state.recipe.steps};
-      localStorage.setItem("pixelproof-recipe-settings", JSON.stringify(settings));
+      persistRecipeSettings();
       $("#recipe-status").textContent = "Step updated.";
     } catch {
       $("#recipe-status").textContent = "That step is not valid JSON yet.";
@@ -1726,8 +1764,8 @@ function renderResults() {
   list.innerHTML = "";
   const good = state.results.filter((r) => r.bytes);
   for (const r of state.results) {
-    const row = document.createElement("div");
-    row.className = "result-item";
+    const row = document.createElement("article");
+    row.className = "result-frame";
     if (r.bytes) {
       const url = URL.createObjectURL(new Blob([r.bytes], { type: r.mime }));
       state.urls.push(url);
@@ -1736,7 +1774,7 @@ function renderResults() {
       const original = r.originalStats ? ` · was ${r.originalStats.width}×${r.originalStats.height}` : "";
       const sourceBytes = r.originalBytes ? ` · was ${Math.round(r.originalBytes / 1024)} KB` : "";
       const dimensions = r.width && r.height ? ` · ${r.width}×${r.height}` : "";
-      row.innerHTML = `<img class="result-thumb" src="${url}" alt=""><div><div class="result-name">${escapeHtml(r.name)}</div><div class="result-meta">${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB${sourceBytes}${dimensions}${original}${quality}${budget}</div></div><a class="btn" draggable="true" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
+      row.innerHTML = `<figure class="result-print"><img class="result-thumb" src="${url}" alt=""><figcaption><strong>${escapeHtml(r.name)}</strong><span>${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB${sourceBytes}${dimensions}${original}${quality}${budget}</span></figcaption></figure><a class="btn result-download" draggable="true" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
       const download = row.querySelector("a[download]");
       download.addEventListener("dragstart", (event) => {
         event.dataTransfer?.setData(
@@ -1746,9 +1784,9 @@ function renderResults() {
         event.dataTransfer?.setData("text/uri-list", url);
         event.dataTransfer.effectAllowed = "copy";
       });
-      if (r.sourcePath) row.querySelector(".result-meta").textContent += ` · ${r.sourcePath}`;
+      if (r.sourcePath) row.querySelector("figcaption span").textContent += ` · ${r.sourcePath}`;
     } else {
-      row.innerHTML = `<div></div><div><div class="result-name">${escapeHtml(r.sourcePath || r.source)}</div><div class="error">${escapeHtml(r.error)}</div><button class="text-button retry-result">Retry this file</button></div>`;
+      row.innerHTML = `<div class="result-failure"><strong>${escapeHtml(r.sourcePath || r.source)}</strong><span class="error">${escapeHtml(r.error)}</span><button class="text-button retry-result">Retry this file</button></div>`;
       row.querySelector(".retry-result").onclick = () => r.file && run([r.file]);
     }
     list.append(row);
