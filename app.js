@@ -499,8 +499,11 @@ toolDefs.forEach((tool) => {
 document
   .querySelectorAll("[data-brand]")
   .forEach((el) => (el.textContent = PRODUCT.brand));
-if ("serviceWorker" in navigator)
+if ("serviceWorker" in navigator) {
+  if (navigator.serviceWorker.controller)
+    navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload());
   navigator.serviceWorker.register("./sw.js", {updateViaCache: "none"}).catch(() => {});
+}
 document.title = `${PRODUCT.brand} — private image tools`;
 $("#isolation-text").textContent =
   `LOCAL / ${crossOriginIsolated ? "ISOLATED" : "NON-ISOLATED"}`;
