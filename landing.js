@@ -74,17 +74,24 @@ if (compareStage && compareSlider && compareOutput && compareDivider && compareH
     const rect = compareStage.getBoundingClientRect();
     return ((event.clientX - rect.left) / rect.width) * 100;
   };
-  compareSlider.addEventListener('input', (event) => updateComparison(event.target.value));
-  compareStage.addEventListener('pointerdown', (event) => {
+  const startDrag = (event) => {
     dragging = true;
     compareStage.setPointerCapture?.(event.pointerId);
     updateComparison(valueFromPoint(event));
-  });
-  compareStage.addEventListener('pointermove', (event) => {
+  };
+  const moveDrag = (event) => {
     if (dragging) updateComparison(valueFromPoint(event));
-  });
-  compareStage.addEventListener('pointerup', () => { dragging = false; });
-  compareStage.addEventListener('pointercancel', () => { dragging = false; });
+  };
+  const endDrag = () => { dragging = false; };
+  compareSlider.addEventListener('input', (event) => updateComparison(event.target.value));
+  compareStage.addEventListener('pointerdown', startDrag);
+  compareStage.addEventListener('pointermove', moveDrag);
+  compareStage.addEventListener('pointerup', endDrag);
+  compareStage.addEventListener('pointercancel', endDrag);
+  compareStage.addEventListener('mousedown', startDrag);
+  compareStage.addEventListener('mousemove', moveDrag);
+  compareStage.addEventListener('mouseup', endDrag);
+  compareStage.addEventListener('click', (event) => updateComparison(valueFromPoint(event)));
   compareStage.addEventListener('touchstart', (event) => {
     const touch = event.touches[0];
     if (!touch) return;
