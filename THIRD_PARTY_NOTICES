@@ -10,11 +10,12 @@ https://www.pexels.com/license/
 
 The Pexels License permits commercial use without required attribution.
 PixelProof includes this source and licence record for provenance; the
-vendored PNG is a browser-local PixelProof background-removal output,
+vendored WebP is a browser-local PixelProof background-removal output,
 not the original photograph. The output was produced through the
-PixelProof selection and continuous-alpha matting workflow, exported as
-735 × 768 PNG with alpha, and is stored at
-vendor/images/pixelproof-cat-cutout.png. No external image request is
+PixelProof selection and continuous-alpha matting workflow, then
+converted through PixelProof's own tools to a 735 × 768 WebP with alpha
+(60,778 bytes, reported in the interface as 59 KB). It is stored at
+vendor/images/pixelproof-cat-cutout.webp. No external image request is
 made at runtime.
 
 PixelProof Phase 2 model provenance

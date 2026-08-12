@@ -30,7 +30,7 @@ const SHELL = [
   "./manifest.webmanifest",
   "./favicon.svg",
   "./social-preview.svg",
-  "./vendor/images/pixelproof-cat-cutout.png",
+  "./vendor/images/pixelproof-cat-cutout.webp",
   "./privacy-policy.html",
   "./terms.html",
   "./refunds.html",

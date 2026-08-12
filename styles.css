@@ -87,9 +87,9 @@ body{background:var(--darkroom);color:var(--paper)}
 .mock-dot{background:var(--amber);border-radius:0}
 .mock-body{padding:38px}
 .mock-body h2{font-family:var(--display-face);font-weight:700}
-.mock-image{align-items:center;background:repeating-conic-gradient(#d2d2d2 0 25%,#eee 0 50%) 0/24px 24px;border:8px solid var(--paper);box-shadow:0 0 0 1px var(--rule);color:var(--darkroom);display:flex;height:240px;justify-content:center;overflow:hidden;position:relative}
+.mock-image{align-items:center;background:repeating-conic-gradient(#d2d2d2 0 25%,#eee 0 50%) 0/24px 24px;border:8px solid var(--paper);box-shadow:0 0 0 1px var(--rule);color:var(--darkroom);display:flex;height:240px;justify-content:center;overflow:hidden;padding:14px}
 .mock-image img{display:block;height:100%;object-fit:contain;width:100%}
-.mock-annotation{background:rgba(12,16,22,.88);bottom:8px;color:var(--paper);display:flex;flex-wrap:wrap;font:9px/1.4 var(--data-face);font-variant-numeric:tabular-nums;gap:8px;left:8px;padding:6px 8px;position:absolute;right:8px;text-transform:uppercase}
+.mock-annotation{background:var(--darkroom-deep);border:1px solid var(--rule);color:var(--paper);display:flex;flex-wrap:wrap;font:9px/1.4 var(--data-face);font-variant-numeric:tabular-nums;gap:8px;margin-top:10px;padding:7px 8px;text-transform:uppercase}
 .mock-annotation span+span{border-left:1px solid var(--paper-dim);padding-left:8px}
 .mock-line{background:var(--amber);height:4px}.mock-line.short{background:var(--paper-dim);height:3px}
 .trust-strip{background:var(--sleeve);border-bottom:1px solid var(--rule);border-top:1px solid var(--rule);color:var(--paper-dim);font-family:var(--data-face);font-variant-numeric:tabular-nums;letter-spacing:.05em}
@@ -162,7 +162,7 @@ body{background:var(--darkroom);color:var(--paper)}
 .app-shell .progress{background:var(--darkroom);height:3px}.app-shell .progress i{background:var(--amber)}
 .app-shell footer{border-color:var(--rule);color:var(--paper-dim);max-width:var(--max)}
 @media(max-width:820px){.app-shell .sidebar{border-bottom:1px solid var(--rule);border-right:0}.app-shell .sidebar nav{padding-bottom:8px}.app-shell .tool-link{padding:11px 14px}.app-shell .recipe-panel{padding:22px 20px}}
-@media(max-width:600px){.landing-card:nth-child(3n+2),.landing-card:nth-child(3n){padding-left:0}.landing-card:nth-child(3n+2)::before,.landing-card:nth-child(3n)::before{display:none}.tool-cards{gap:0}.app-shell .shell{padding-top:24px}.app-shell .dropzone{padding:56px 14px}.app-shell .controls,.app-shell .results{padding:18px 16px}.app-shell .result-item{grid-template-columns:58px minmax(0,1fr)}.app-shell .result-thumb{height:48px;width:58px}.mock-annotation{bottom:5px;gap:5px;left:5px;padding:5px;right:5px}.mock-annotation span+span{padding-left:5px}}
+@media(max-width:600px){.landing-card:nth-child(3n+2),.landing-card:nth-child(3n){padding-left:0}.landing-card:nth-child(3n+2)::before,.landing-card:nth-child(3n)::before{display:none}.tool-cards{gap:0}.app-shell .shell{padding-top:24px}.app-shell .dropzone{padding:56px 14px}.app-shell .controls,.app-shell .results{padding:18px 16px}.app-shell .result-item{grid-template-columns:58px minmax(0,1fr)}.app-shell .result-thumb{height:48px;width:58px}.mock-image{height:170px;padding:10px}.mock-annotation{gap:5px;padding:5px}.mock-annotation span+span{padding-left:5px}}
 @media(max-width:600px){.app-shell .recipe-step summary{align-items:flex-start;flex-wrap:wrap}.app-shell .recipe-step summary em{margin-left:34px;width:100%}.app-shell .recipe-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.app-shell .recipe-fields .recipe-control-note{grid-column:1/-1}}
 
 /* Buyer-facing darkroom surfaces. */
