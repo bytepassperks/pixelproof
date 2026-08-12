@@ -19,31 +19,35 @@ vendor/images/pixelproof-cat-cutout.webp. No external image request is
 made at runtime.
 
 The landing background-removal comparison uses the same 1,600 × 1,064
-photograph as the bundled sample. PixelProof ran that photograph through its
-own click-to-select and continuous-alpha matting workflow, then quantized the
-transparent PNG for display without changing its dimensions. The result is
-stored at vendor/images/pixelproof-sample-photo-cutout.png and is 441,862
-bytes. The shipped original is vendor/images/pixelproof-sample-photo.jpg at
-298,514 bytes; both artifacts are pixel-aligned and derived from the same
-CC0 photograph above.
+photograph as the bundled sample. It is the Pexels record “White and Brown
+Dogs on Green Grass” (photo 1108099), downloaded from
+https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg under the
+Pexels license. The source was center-cropped to the shipped 1,600 × 1,064
+frame. PixelProof then ran that photograph through its own click-to-select
+and continuous-alpha matting workflow, and quantized the transparent PNG for
+display without changing its dimensions. The result is stored at
+vendor/images/pixelproof-sample-photo-cutout.png and is 310,456 bytes. The
+shipped original is vendor/images/pixelproof-sample-photo.jpg at 242,455
+bytes; both artifacts are pixel-aligned and derived from the same photograph.
 
-The immersive comparison and bundled workbench sample use a photograph of a
-white, orange, and gray tabby cat lying on gray textile, originally published
-on Pexels by Fabricio Trujillo and mirrored on Wikimedia Commons:
-https://commons.wikimedia.org/wiki/File:White_Orange_and_Gray_Tabby_Cat.jpg
-The Commons record identifies the source as Pexels and makes the photograph
-available under CC0 1.0:
-https://creativecommons.org/publicdomain/zero/1.0/
+The JPEG compression comparison is also derived from that same photograph:
+vendor/images/pixelproof-comparison-photo.jpg is 122,535 bytes, compared with
+242,455 bytes for the original, both at 1,600 × 1,064 pixels.
 
-PixelProof resized the source through its own resize workflow to 1,600 ×
-1,064, then encoded the shipped sample photograph as a 298,514-byte JPEG at
-high quality. The landing comparison output was generated from that exact
-file through PixelProof's own JPEG compression workflow at quality 72,
-preserving the same 1,600 × 1,064 dimensions. It is stored at
-vendor/images/pixelproof-comparison-photo.jpg and is 123,347 bytes. The
-displayed 298,514-byte original and 123,347-byte output values are the exact
-shipped file sizes. The sample input is stored at
-vendor/images/pixelproof-sample-photo.jpg and is the same 298,514-byte file.
+The immersive comparison and bundled workbench sample use the Pexels record
+“White and Brown Dogs on Green Grass” (photo 1108099), downloaded from
+https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg under the
+Pexels license:
+https://www.pexels.com/license/
+
+PixelProof center-cropped the source through its own image workflow to
+1,600 × 1,064, then encoded the shipped sample photograph as a 242,455-byte
+JPEG. The landing comparison output is generated from that exact file,
+preserving the same 1,600 × 1,064 dimensions, and is stored at
+vendor/images/pixelproof-comparison-photo.jpg at 122,535 bytes. The displayed
+242,455-byte original and 122,535-byte output values are the exact shipped
+file sizes. The sample input is stored at
+vendor/images/pixelproof-sample-photo.jpg and is the same 242,455-byte file.
 
 PixelProof Phase 2 model provenance
 
