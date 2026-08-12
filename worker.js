@@ -1,5 +1,11 @@
 import { injectJpegExif } from "./metadata.js";
 
+function userFacingError(message) {
+  const error = new Error(message);
+  error.userFacing = true;
+  return error;
+}
+
 function fitWithin(width, height, maxWidth, maxHeight) {
   const scale = Math.min(maxWidth / width, maxHeight / height, 1);
   return {width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale))};
@@ -28,7 +34,7 @@ async function encode(canvas, mime, quality) {
 }
 async function encodeWithMetadata(canvas, mime, quality, metadata) {
   const result = await encode(canvas, mime, quality);
-  if (mime && result.mime !== mime) throw new Error(`The browser could not encode ${mime} without falling back to ${result.mime}.`);
+  if (mime && result.mime !== mime) throw userFacingError(`The browser could not encode ${mime} without falling back to ${result.mime}.`);
   if (result.mime === "image/jpeg" && metadata?.mode === "preserve") {
     result.bytes = injectJpegExif(result.bytes, metadata);
   }
@@ -317,7 +323,7 @@ function blurBox(ctx, box, mode, strength) {
 self.onmessage = async ({data}) => {
   try {
     const {id, file, operation} = data, image = await decode(file.buffer, file.type);
-    if (image.width * image.height > (operation.maxPixels || 64_000_000)) throw new Error(`Image is too large (${image.width}×${image.height}).`);
+    if (image.width * image.height > (operation.maxPixels || 64_000_000)) throw userFacingError(`Image is too large (${image.width}×${image.height}).`);
     let width = image.width, height = image.height, canvas = new OffscreenCanvas(width, height);
     const ctx = canvas.getContext('2d', {alpha: true});
     ctx.imageSmoothingQuality = 'high';
@@ -417,7 +423,7 @@ self.onmessage = async ({data}) => {
             scaled -= 0.1;
           }
         }
-        if (!best) throw new Error(`Could not reach ${Math.round(budget / 1024)} KB at ${width}×${height}. Lower dimensions and try again.`);
+        if (!best) throw userFacingError(`Could not reach ${Math.round(budget / 1024)} KB at ${width}×${height}. Lower dimensions and try again.`);
       }
       result = best;
     } else {
@@ -436,5 +442,5 @@ self.onmessage = async ({data}) => {
     }
     self.postMessage({id, ok: true, ...result}, [result.bytes]);
     image.close();
-  } catch (error) { self.postMessage({id: data.id, ok: false, error: String(error)}); }
+  } catch (error) { self.postMessage({id: data.id, ok: false, error: String(error), userFacing: error?.userFacing === true}); }
 };

@@ -1368,6 +1368,7 @@ function stem(name) {
 }
 function friendlyError(error) {
   const message = String(error?.message || error || "Unknown image-processing error.");
+  if (error?.userFacing) return message;
   if (/could not be decoded|decode|invalidstateerror/i.test(message))
     return "This file could not be decoded as a supported image. Check that it is a real JPEG, PNG, WebP, HEIC/HEIF, BMP, GIF, ICO, or SVG file.";
   if (/worker failed|failed to fetch|network|out of memory|memory/i.test(message))
@@ -1420,7 +1421,12 @@ async function processOne(file, op) {
   return new Promise((resolve, reject) => {
     worker.onmessage = (e) => {
       worker.terminate();
-      e.data.ok ? resolve(e.data) : reject(new Error(e.data.error));
+      if (e.data.ok) resolve(e.data);
+      else {
+        const error = new Error(e.data.error);
+        error.userFacing = e.data.userFacing === true;
+        reject(error);
+      }
     };
     worker.onerror = (e) => {
       worker.terminate();
