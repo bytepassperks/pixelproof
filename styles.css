@@ -236,7 +236,7 @@ button:active:not(:disabled),.btn:active:not(:disabled){transform:translate(2px,
 button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-soft);box-shadow:none;color:var(--paper-dim);opacity:.58}
 .text-button:hover:not(:disabled){color:var(--amber-bright);text-decoration:underline;text-underline-offset:4px}
 .text-button:active:not(:disabled){transform:none}
-.landing-nav a:not(.btn):hover,.landing footer a:hover{color:var(--rust);text-decoration-thickness:2px}
+.landing-nav a:not(.btn):hover,.landing footer a:hover{color:var(--amber-bright);text-decoration-thickness:2px}
 .landing .btn:hover:not(:disabled){box-shadow:6px 6px 0 var(--ink);transform:translate(-2px,-2px)}
 .landing .btn:active:not(:disabled){box-shadow:2px 2px 0 var(--ink);transform:translate(2px,2px)}
 .landing h1,.landing h2,.landing h3,.app-shell h1,.app-shell h2,.app-shell h3,.activation-card h1{text-wrap:balance}
@@ -271,7 +271,7 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .app-shell .result-failure{border-left:3px solid #ff9b83;padding-left:var(--space-3)}
 .app-shell dialog{padding:var(--space-6);max-height:min(720px,calc(100vh - 40px));overflow:auto}
 .app-shell .dialog-close{color:var(--paper-dim);line-height:1;padding:4px}
-.app-shell .dialog-close:hover{color:var(--amber-bright);transform:rotate(8deg)}
+.app-shell .dialog-close:hover{color:var(--amber-bright)}
 .app-shell .privacy-self-test,.app-shell .local-data-panel{padding:var(--space-5)}
 .app-shell .local-data-actions{gap:var(--space-3);margin-top:var(--space-3)}
 .activation-page .activation-card input:hover{border-color:var(--paper-dim)}

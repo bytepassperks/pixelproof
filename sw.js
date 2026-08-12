@@ -1,4 +1,4 @@
-const CACHE = "pixelproof-shell-20260812-21";
+const CACHE = "pixelproof-shell-20260812-22";
 const SHELL = [
   "./",
   "./index.html",
