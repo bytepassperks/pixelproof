@@ -1,4 +1,4 @@
-const CACHE = "pixelproof-shell-20260812-27";
+const CACHE = "pixelproof-shell-20260812-28";
 const SHELL = [
   "./",
   "./index.html",
@@ -31,7 +31,8 @@ const SHELL = [
   "./favicon.svg",
   "./social-preview.svg",
   "./vendor/images/pixelproof-cat-cutout.webp",
-  "./vendor/images/pixelproof-comparison-compressed.webp",
+  "./vendor/images/pixelproof-sample-photo.jpg",
+  "./vendor/images/pixelproof-comparison-photo.jpg",
   "./privacy-policy.html",
   "./terms.html",
   "./refunds.html",

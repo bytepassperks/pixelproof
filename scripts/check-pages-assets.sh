@@ -39,7 +39,8 @@ assets=(
   favicon.svg
   social-preview.svg
   vendor/images/pixelproof-cat-cutout.webp
-  vendor/images/pixelproof-comparison-compressed.webp
+  vendor/images/pixelproof-sample-photo.jpg
+  vendor/images/pixelproof-comparison-photo.jpg
   404.html
   vendor/heic/libheif.js
   vendor/heic/libheif.wasm

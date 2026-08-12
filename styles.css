@@ -296,7 +296,7 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .proof-compare-card{margin:var(--space-6) auto 0;max-width:1120px}
 .proof-compare-stage{background:var(--darkroom-deep);border:1px solid var(--rule);height:clamp(300px,50vw,620px);overflow:hidden;position:relative;touch-action:none}
 .proof-compare-panel{height:100%;margin:0;position:absolute;width:100%}
-.proof-compare-panel img{background:repeating-conic-gradient(#5e5d58 0 25%,#85837d 0 50%) 0/24px 24px;display:block;height:100%;object-fit:contain;width:100%}
+.proof-compare-panel img{background:var(--darkroom-deep);display:block;height:100%;object-fit:contain;width:100%}
 .proof-compare-original{z-index:1}
 .proof-compare-output{clip-path:inset(0 0 0 50%);z-index:2}
 .proof-compare-panel figcaption{background:rgba(9,9,8,.9);bottom:var(--space-4);display:grid;gap:var(--space-1);left:var(--space-4);padding:var(--space-2) var(--space-3);position:absolute}

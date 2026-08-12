@@ -531,12 +531,12 @@ $("#sample-run").onclick = async () => {
   button.disabled = true;
   button.textContent = "Loading sample…";
   try {
-    const response = await fetch("./vendor/images/pixelproof-cat-cutout.webp", {cache: "no-store"});
+    const response = await fetch("./vendor/images/pixelproof-sample-photo.jpg", {cache: "no-store"});
     if (!response.ok) throw new Error("Sample image could not be loaded.");
     const blob = await response.blob();
     clearFiles();
     state.sample = true;
-    const file = new File([blob], "pixelproof-sample.webp", {type: "image/webp"});
+    const file = new File([blob], "pixelproof-sample.jpg", {type: "image/jpeg"});
     addFiles([file], true);
     $("#run-status").textContent = "Bundled sample ready. Running the local pipeline…";
     await run([file], true);
