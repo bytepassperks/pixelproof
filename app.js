@@ -367,7 +367,7 @@ function initRecipes() {
   $("#recipe-import").onclick = () => $("#recipe-import-file").click();
   $("#recipe-import-file").onchange = (event) => importRecipe(event);
   $("#toggle-tools").onclick = () => {
-    $(".sidebar").scrollIntoView({behavior: "smooth", block: "start"});
+    $(".sidebar").scrollIntoView({behavior: "auto", block: "start"});
     $(".sidebar").classList.add("focus-tools");
     setTimeout(() => $(".sidebar").classList.remove("focus-tools"), 900);
   };
@@ -709,7 +709,7 @@ function addFiles(list, isSample = false) {
   $("#file-summary").hidden = false;
   const entitlement = getEntitlementState();
   const jobLimit = entitlement.tasksPerDay === Infinity
-    ? "unlimited jobs today"
+    ? "unlimited jobs"
     : `${Math.max(0, entitlement.tasksPerDay - entitlement.tasksUsed)} jobs left today`;
   $("#file-summary").innerHTML =
     `<span>${state.sample ? "Bundled sample · " : ""}${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}${state.sample ? ' · <button class="text-button clear-sample" type="button">Clear sample</button>' : ""}</span><div id="animation-warning"></div>`;
