@@ -3,6 +3,7 @@ set -euo pipefail
 
 base_url="${1:-https://pixelproof.pages.dev}"
 base_url="${base_url%/}"
+deployment_origin="${2:-$(printf '%s' "$base_url" | sed -E 's#^(https?://[^/]+).*#\1#')}"
 model_mirror="https://pub-a8d1cffdfd404e2da5d08c1f0a266934.r2.dev"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -115,4 +116,22 @@ for model_spec in "${model_assets[@]}"; do
   [[ "$actual_bytes" == "$expected_bytes" ]] ||
     { echo "asset check failed: model $model is $actual_bytes bytes, expected $expected_bytes" >&2; exit 1; }
   printf 'ok %-24s model %s bytes\n' "$model" "$actual_bytes"
+
+  cors_headers="$tmp_dir/cors-$model"
+  curl --fail --silent --show-error --location \
+    --header "Origin: $deployment_origin" \
+    --header "Range: bytes=0-0" \
+    --range 0-0 --output /dev/null --dump-header "$cors_headers" \
+    "$model_mirror/$model"
+  expected_cors="$(printf '%s' "$deployment_origin" | tr '[:upper:]' '[:lower:]')"
+  actual_cors="$(
+    sed -n 's/^[[:space:]]*[Aa]ccess-[Cc]ontrol-[Aa]llow-[Oo]rigin:[[:space:]]*//p' "$cors_headers" |
+      tr -d '\r' | tr '[:upper:]' '[:lower:]' | tail -1
+  )"
+  [[ "$actual_cors" == "$expected_cors" ]] ||
+    {
+      echo "asset check failed: model $model has no CORS access for $deployment_origin" >&2
+      exit 1
+    }
+  printf 'ok %-24s CORS for %s\n' "$model" "$deployment_origin"
 done
