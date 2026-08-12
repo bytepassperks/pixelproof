@@ -939,6 +939,17 @@ converted from the upstream TTF files with fontTools; the converted
 files are used locally by the interface under vendor/fonts/. No font
 data or third-party code was added beyond the upstream typefaces.
 
+Typography alternatives
+------------------------
+
+Alternative A vendors a latin-subset WOFF2 of Plus Jakarta Sans under
+the SIL Open Font License, version 1.1. Alternative B vendors latin-
+subset WOFF2 files of Literata, Source Sans 3, and IBM Plex Mono under
+the SIL Open Font License, version 1.1. Alternative C vendors latin-
+subset WOFF2 files of Barlow Condensed under the SIL Open Font License,
+version 1.1. These files are locally vendored from the upstream Google
+Fonts distributions; no external font requests are made at runtime.
+
 ----------------------------------------------------------------------
 
 pdf-lib 1.17.1
