@@ -92,6 +92,8 @@ if (compareStage && compareSlider && compareOutput && compareDivider && compareH
   compareStage.addEventListener('mousemove', moveDrag);
   compareStage.addEventListener('mouseup', endDrag);
   compareStage.addEventListener('click', (event) => updateComparison(valueFromPoint(event)));
+  compareStage.addEventListener('dragstart', (event) => event.preventDefault());
+  compareStage.addEventListener('selectstart', (event) => event.preventDefault());
   compareStage.addEventListener('touchstart', (event) => {
     const touch = event.touches[0];
     if (!touch) return;

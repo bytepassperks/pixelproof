@@ -1343,6 +1343,8 @@ function mountFaceBlur() {
   };
   $("#face-add-region").onclick = () => addRegion();
   canvas.onpointerdown = (event) => { const rect = canvas.getBoundingClientRect(); start = {x: event.clientX - rect.left, y: event.clientY - rect.top}; };
+  canvas.addEventListener("dragstart", (event) => event.preventDefault());
+  canvas.addEventListener("selectstart", (event) => event.preventDefault());
   canvas.onpointerup = (event) => {
     if (!start) return;
     const rect = canvas.getBoundingClientRect();

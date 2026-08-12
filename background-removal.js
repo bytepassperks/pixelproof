@@ -357,7 +357,7 @@ export function mountBackgroundTool(container, context) {
       if (event.key === "ArrowDown") controls.y.value = String(Math.min(1024, Number(controls.y.value) + delta));
       status.textContent = `Selection point ${controls.x.value}, ${controls.y.value}. Press Enter to set it.`;
     };
-    canvas.onclick = (event) => {
+      canvas.onclick = (event) => {
       const rect = canvas.getBoundingClientRect();
       const x = Math.round(
         ((event.clientX - rect.left) * canvas.width) / rect.width,
@@ -369,7 +369,9 @@ export function mountBackgroundTool(container, context) {
       const modelY = Math.round((y * 1024) / canvas.height);
       setPoint((modelX * 1024) / canvas.width, (modelY * 1024) / canvas.height, event.shiftKey ? 0 : 1);
       status.textContent = `${event.shiftKey ? "Negative" : "Positive"} click registered at ${x}, ${y} → model ${modelX}, ${modelY}`;
-    };
+      };
+      canvas.addEventListener("dragstart", (event) => event.preventDefault());
+      canvas.addEventListener("selectstart", (event) => event.preventDefault());
   }
   controls.background.onchange = () =>
     renderPreview(canvas, current.result, controls.background.value);

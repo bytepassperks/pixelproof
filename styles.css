@@ -296,9 +296,10 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .landing .proof-compare .section-heading{max-width:760px}
 .landing .proof-compare .section-heading h2{color:var(--amber-bright);font-size:clamp(38px,5.5vw,78px)}
 .proof-compare-card{align-items:stretch;display:grid;gap:var(--space-6);grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);margin:var(--space-6) 0 var(--space-6);max-width:none}
-.proof-compare-stage{aspect-ratio:1024 / 1152;background:repeating-conic-gradient(#f5f5ef 0 25%,#d8d8d0 0 50%) 0/28px 28px;border:1px solid var(--rule);height:auto;overflow:hidden;position:relative;touch-action:none}
+.proof-compare-stage{aspect-ratio:1024 / 1152;background:repeating-conic-gradient(#f5f5ef 0 25%,#d8d8d0 0 50%) 0/28px 28px;border:1px solid var(--rule);height:auto;overflow:hidden;position:relative;touch-action:none;user-select:none}
 .proof-compare-panel{height:100%;margin:0;position:absolute;width:100%}
-.proof-compare-panel img{background:transparent;display:block;height:100%;object-fit:contain;width:100%}
+.proof-compare-panel img{-webkit-user-drag:none;background:transparent;display:block;height:100%;object-fit:contain;user-select:none;width:100%}
+.background-canvas,.tool-preview{user-select:none}
 .proof-compare-original{z-index:1}
 .proof-compare-output{background:repeating-conic-gradient(#f5f5ef 0 25%,#d8d8d0 0 50%) 0/28px 28px;clip-path:inset(0 0 0 50%);z-index:2}
 .proof-compare-divider{background:var(--amber-bright);bottom:0;box-shadow:0 0 0 1px var(--darkroom-deep);left:50%;pointer-events:none;position:absolute;top:0;width:2px;z-index:3}
