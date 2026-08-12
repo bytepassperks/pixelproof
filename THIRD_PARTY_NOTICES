@@ -2,25 +2,25 @@ PixelProof landing-page demonstration photograph
 -------------------------------------------------
 
 The landing background-removal comparison uses the same 1,600 × 1,064
-photograph as the bundled sample. It is the Pexels record “Minimalist Lemon
-Slice Against Black Background” (photo 35508870), downloaded from
-https://images.pexels.com/photos/35508870/pexels-photo-35508870.jpeg under the
-Pexels license. The source was center-cropped to the shipped 1,600 × 1,064
-frame. PixelProof then ran the photograph through its local subject-selection
-and continuous-alpha workflow; the transparent PNG is stored at
-vendor/images/pixelproof-sample-photo-cutout.png and is 831,809 bytes. The
-shipped original is vendor/images/pixelproof-sample-photo.jpg at 94,873 bytes.
-The subject is centered with clear margin on every side and the output uses
-an alpha edge with the background removed.
+photograph as the bundled sample. It is the Pexels record “Cute Dog Sitting
+on Blue Surface” (photo 7516799), downloaded from
+https://images.pexels.com/photos/7516799/pexels-photo-7516799.jpeg under the
+Pexels license. The portrait source was fitted into a 1,600 × 1,064 landscape
+frame with blue background retained, then processed through PixelProof's local
+subject-selection and continuous-alpha workflow. The transparent PNG is
+stored at vendor/images/pixelproof-sample-photo-cutout.png and is 486,824
+bytes. The shipped original is vendor/images/pixelproof-sample-photo.jpg at
+162,497 bytes. The dog is centered, fully inside the frame, and crosses the
+comparison midpoint with margin on every side.
 
-The landing hero uses padded WebP derivatives of that same transparent output:
-vendor/images/pixelproof-dog-hero-1024.webp is 1,024 × 681 and 25,206 bytes,
-while vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 7,980 bytes.
-Both preserve alpha and include transparent margin around the complete lemon.
+The landing hero uses padded WebP derivatives of that same refined output:
+vendor/images/pixelproof-dog-hero-1024.webp is 1,024 × 681 and 24,896 bytes,
+while vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 8,944 bytes.
+Both preserve alpha and include transparent margin around the complete dog.
 
 The JPEG compression comparison is also derived from that same photograph:
-vendor/images/pixelproof-comparison-photo.jpg is 56,284 bytes, compared with
-94,873 bytes for the original, both at 1,600 × 1,064 pixels.
+vendor/images/pixelproof-comparison-photo.jpg is 69,359 bytes, compared with
+162,497 bytes for the original, both at 1,600 × 1,064 pixels.
 
 PixelProof Phase 2 model provenance
 
