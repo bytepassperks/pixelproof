@@ -59,12 +59,16 @@ if (state.tier !== 'free') {
 const compareStage = document.querySelector('#proof-compare-stage');
 const compareSlider = document.querySelector('#proof-compare-slider');
 const compareOutput = document.querySelector('#proof-compare-output');
-if (compareStage && compareSlider && compareOutput) {
+const compareDivider = document.querySelector('.proof-compare-divider');
+const compareHandle = document.querySelector('.proof-compare-handle');
+if (compareStage && compareSlider && compareOutput && compareDivider && compareHandle) {
   let dragging = false;
   const updateComparison = (value) => {
     const position = Math.max(0, Math.min(100, Number(value) || 0));
     compareSlider.value = String(position);
     compareOutput.style.clipPath = `inset(0 0 0 ${position}%)`;
+    compareDivider.style.left = `${position}%`;
+    compareHandle.style.left = `${position}%`;
   };
   const valueFromPoint = (event) => {
     const rect = compareStage.getBoundingClientRect();
