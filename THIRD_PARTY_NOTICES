@@ -929,26 +929,14 @@ SOFTWARE.
 
 ----------------------------------------------------------------------
 
-PixelProof UI fonts
--------------------
+PixelProof UI font
+------------------
 
-Instrument Serif is distributed under the SIL Open Font License,
-version 1.1. JetBrains Mono is distributed under the SIL Open Font
-License, version 1.1. PixelProof vendors latin-subset WOFF2 files
-converted from the upstream TTF files with fontTools; the converted
-files are used locally by the interface under vendor/fonts/. No font
-data or third-party code was added beyond the upstream typefaces.
-
-Typography alternatives
-------------------------
-
-Alternative A vendors a latin-subset WOFF2 of Plus Jakarta Sans under
-the SIL Open Font License, version 1.1. Alternative B vendors latin-
-subset WOFF2 files of Literata, Source Sans 3, and IBM Plex Mono under
-the SIL Open Font License, version 1.1. Alternative C vendors latin-
-subset WOFF2 files of Barlow Condensed under the SIL Open Font License,
-version 1.1. These files are locally vendored from the upstream Google
-Fonts distributions; no external font requests are made at runtime.
+Plus Jakarta Sans is distributed under the SIL Open Font License,
+version 1.1. PixelProof vendors a latin-subset WOFF2 file converted
+from the upstream distribution; it is used locally by the display,
+UI, and data roles under vendor/fonts/alternatives/. No external font
+requests are made at runtime.
 
 ----------------------------------------------------------------------
 

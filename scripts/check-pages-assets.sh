@@ -16,16 +16,7 @@ assets=(
   refunds
   contact
   styles.css
-  vendor/fonts/InstrumentSerif-Latin.woff2
-  vendor/fonts/JetBrainsMono-Latin.woff2
-  vendor/fonts/JetBrainsMono-Bold-Latin.woff2
   vendor/fonts/alternatives/PlusJakartaSans-Latin.woff2
-  vendor/fonts/alternatives/Literata-Latin.woff2
-  vendor/fonts/alternatives/SourceSans3-Latin.woff2
-  vendor/fonts/alternatives/IBMPlexMono-Latin.woff2
-  vendor/fonts/alternatives/BarlowCondensed-Regular-Latin.woff2
-  vendor/fonts/alternatives/BarlowCondensed-Bold-Latin.woff2
-  vendor/fonts/alternatives/BarlowCondensed-ExtraBold-Latin.woff2
   app.js
   activation.js
   background-removal.js
