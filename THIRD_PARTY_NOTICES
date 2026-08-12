@@ -6,16 +6,16 @@ photograph as the bundled sample. It is the Pexels record “Cute Dog Sitting
 on Blue Surface” (photo 7516799), downloaded from
 https://images.pexels.com/photos/7516799/pexels-photo-7516799.jpeg under the
 Pexels license. The portrait source was fitted into a 1,600 × 1,064 landscape
-frame with blue background retained, then processed through PixelProof's local
-subject-selection and continuous-alpha workflow. The transparent PNG is
-stored at vendor/images/pixelproof-sample-photo-cutout.png and is 486,824
+frame with blue background retained, then processed through the deployed PixelProof local subject-selection, SAM segmentation,
+ViTMatte alpha matting, and refine/decontamination workflow. The transparent PNG is
+stored at vendor/images/pixelproof-sample-photo-cutout.png and is 744,915
 bytes. The shipped original is vendor/images/pixelproof-sample-photo.jpg at
 162,497 bytes. The dog is centered, fully inside the frame, and crosses the
 comparison midpoint with margin on every side.
 
 The landing hero uses padded WebP derivatives of that same refined output:
-vendor/images/pixelproof-dog-hero-1024.webp is 1,024 × 681 and 24,896 bytes,
-while vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 8,944 bytes.
+vendor/images/pixelproof-dog-hero-1024.webp is 1,024 × 681 and 37,974 bytes,
+while vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 12,886 bytes.
 Both preserve alpha and include transparent margin around the complete dog.
 
 The JPEG compression comparison is also derived from that same photograph:
