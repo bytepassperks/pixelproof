@@ -72,7 +72,7 @@ if (compareStage && compareSlider && compareOutput) {
   };
   compareSlider.addEventListener('input', (event) => updateComparison(event.target.value));
   compareStage.addEventListener('pointerdown', (event) => {
-    if (event.target === compareSlider || window.matchMedia('(max-width: 600px)').matches) return;
+    if (event.target === compareSlider) return;
     dragging = true;
     compareStage.setPointerCapture?.(event.pointerId);
     updateComparison(valueFromPoint(event));
