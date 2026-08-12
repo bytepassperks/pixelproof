@@ -1,23 +1,6 @@
 PixelProof landing-page demonstration photograph
 -------------------------------------------------
 
-PixelProof vendors a background-removal output derived from the Pexels
-source photograph “Gray and white cat”:
-https://www.pexels.com/photo/gray-and-white-cat-45201/
-
-The source is covered by the Pexels License:
-https://www.pexels.com/license/
-
-The Pexels License permits commercial use without required attribution.
-PixelProof includes this source and licence record for provenance; the
-vendored WebP is a browser-local PixelProof background-removal output,
-not the original photograph. The output was produced through the
-PixelProof selection and continuous-alpha matting workflow, then
-converted through PixelProof's own tools to a 735 × 768 WebP with alpha
-(60,778 bytes, reported in the interface as 59 KB). It is stored at
-vendor/images/pixelproof-cat-cutout.webp. No external image request is
-made at runtime.
-
 The landing background-removal comparison uses the same 1,600 × 1,064
 photograph as the bundled sample. It is the Pexels record for photo 2607544,
 “White dog wearing pink heart-shaped sunglasses,” downloaded from
@@ -31,6 +14,13 @@ shipped original is vendor/images/pixelproof-sample-photo.jpg at 222,927
 bytes; both artifacts are pixel-aligned and derived from the same photograph.
 The cutout uses PixelProof's optional edge-cleanup/decontamination pass,
 enabled by default for new background-removal runs.
+
+The landing hero uses responsive WebP derivatives of that same refined
+cutout: vendor/images/pixelproof-dog-hero-1024.webp is 1,024 × 681 and
+37,146 bytes for desktop/retina display, while
+vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 10,686 bytes for
+small screens. Both preserve alpha and are generated only from the shipped
+sample/cutout; no separate demo subject is used.
 
 The JPEG compression comparison is also derived from that same photograph:
 vendor/images/pixelproof-comparison-photo.jpg is 115,690 bytes, compared with
