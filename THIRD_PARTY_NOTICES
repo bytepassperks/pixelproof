@@ -1,3 +1,22 @@
+PixelProof landing-page demonstration photograph
+-------------------------------------------------
+
+PixelProof vendors a background-removal output derived from the Pexels
+source photograph “Gray and white cat”:
+https://www.pexels.com/photo/gray-and-white-cat-45201/
+
+The source is covered by the Pexels License:
+https://www.pexels.com/license/
+
+The Pexels License permits commercial use without required attribution.
+PixelProof includes this source and licence record for provenance; the
+vendored PNG is a browser-local PixelProof background-removal output,
+not the original photograph. The output was produced through the
+PixelProof selection and continuous-alpha matting workflow, exported as
+735 × 768 PNG with alpha, and is stored at
+vendor/images/pixelproof-cat-cutout.png. No external image request is
+made at runtime.
+
 PixelProof Phase 2 model provenance
 
 EfficientSAM-Ti

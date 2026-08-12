@@ -38,6 +38,7 @@ assets=(
   sitemap.xml
   favicon.svg
   social-preview.svg
+  vendor/images/pixelproof-cat-cutout.png
   404.html
   vendor/heic/libheif.js
   vendor/heic/libheif.wasm
