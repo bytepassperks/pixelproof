@@ -201,9 +201,11 @@ function pngToIco(png, width, height) {
   view.setUint16(4, 1, true);
   bytes[6] = width >= 256 ? 0 : width;
   bytes[7] = height >= 256 ? 0 : height;
-  bytes[8] = 0; bytes[9] = 0; bytes[10] = 1; bytes[11] = 0;
-  view.setUint32(12, png.byteLength, true);
-  view.setUint32(16, 22, true);
+  bytes[8] = 0; bytes[9] = 0;
+  view.setUint16(10, 1, true);
+  view.setUint16(12, 32, true);
+  view.setUint32(14, png.byteLength, true);
+  view.setUint32(18, 22, true);
   bytes.set(new Uint8Array(png), 22);
   return bytes.buffer;
 }
