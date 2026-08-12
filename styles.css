@@ -445,7 +445,7 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 }
 @media(max-width:600px){
   .landing .tool-cards{
-    grid-template-columns:1fr;
+    grid-template-columns:1fr !important;
     min-width:0
   }
   .landing .tool-cards > *{
