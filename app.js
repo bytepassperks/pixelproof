@@ -1989,10 +1989,17 @@ function renderResults() {
       state.urls.push(url);
       const quality = r.quality ? ` · quality ${Math.round(r.quality * 100)}%` : "";
       const budget = r.resizedForBudget ? " · dimensions reduced to hit budget" : "";
-      const original = r.originalStats ? ` · was ${r.originalStats.width}×${r.originalStats.height}` : "";
-      const sourceBytes = r.originalBytes ? ` · was ${Math.round(r.originalBytes / 1024)} KB` : "";
-      const dimensions = r.width && r.height ? ` · ${r.width}×${r.height}` : "";
-      row.innerHTML = `<figure class="result-print"><img class="result-thumb" src="${url}" alt=""><figcaption><strong>${escapeHtml(r.name)}</strong><span>${escapeHtml(r.mime)} · ${Math.round(r.bytes.byteLength / 1024)} KB${sourceBytes}${dimensions}${original}${quality}${budget}</span></figcaption></figure><a class="btn result-download" draggable="true" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
+      const outputBytes = r.bytes.byteLength;
+      const byteNote = r.originalBytes && r.originalBytes !== outputBytes
+        ? ` · ${formatBytes(outputBytes)} · was ${formatBytes(r.originalBytes)}`
+        : ` · ${formatBytes(outputBytes)}`;
+      const hasDimensions = r.width && r.height;
+      const dimensionsChanged = hasDimensions && r.originalStats
+        && (r.width !== r.originalStats.width || r.height !== r.originalStats.height);
+      const dimensionNote = hasDimensions
+        ? ` · ${r.width}×${r.height}${dimensionsChanged ? ` · was ${r.originalStats.width}×${r.originalStats.height}` : ""}`
+        : "";
+      row.innerHTML = `<figure class="result-print"><img class="result-thumb" src="${url}" alt=""><figcaption><strong>${escapeHtml(r.name)}</strong><span>${escapeHtml(r.mime)}${byteNote}${dimensionNote}${quality}${budget}</span></figcaption></figure><a class="btn result-download" draggable="true" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
       const download = row.querySelector("a[download]");
       download.addEventListener("dragstart", (event) => {
         event.dataTransfer?.setData(
