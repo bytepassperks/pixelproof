@@ -192,6 +192,7 @@ const state = {
   retryFiles: [],
   pdfOrder: [],
   animationFiles: [],
+  sample: false,
 };
 const supportedFormats = new Set();
 const originalStats = new WeakMap();
@@ -525,6 +526,27 @@ document.querySelectorAll("[data-clear-local]").forEach((button) => {
 renderPrivacySelfTest();
 $("#choose-files").onclick = () => $("#file-input").click();
 $("#choose-folder").onclick = () => $("#folder-input").click();
+$("#sample-run").onclick = async () => {
+  const button = $("#sample-run");
+  button.disabled = true;
+  button.textContent = "Loading sample…";
+  try {
+    const response = await fetch("./vendor/images/pixelproof-cat-cutout.webp", {cache: "no-store"});
+    if (!response.ok) throw new Error("Sample image could not be loaded.");
+    const blob = await response.blob();
+    clearFiles();
+    state.sample = true;
+    const file = new File([blob], "pixelproof-sample.webp", {type: "image/webp"});
+    addFiles([file], true);
+    $("#run-status").textContent = "Bundled sample ready. Running the local pipeline…";
+    await run([file], true);
+  } catch (error) {
+    $("#run-status").textContent = "The bundled sample could not be loaded. Choose one of your own files instead.";
+  } finally {
+    button.disabled = false;
+    button.textContent = "See it work with a sample";
+  }
+};
 $("#file-input").onchange = (e) => addFiles(e.target.files);
 $("#folder-input").onchange = (e) => addFiles(e.target.files);
 async function consumeSharedFiles() {
@@ -629,13 +651,19 @@ document
   $("#tool-description").textContent = tool.description;
   renderControls();
 }
-function addFiles(list) {
+function addFiles(list, isSample = false) {
   const incoming = [...list].filter((f) =>
     /^image\/(jpeg|png|webp|bmp|gif|svg\+xml|apng)$/.test(f.type) ||
     /^(image\/(x-icon|vnd\.microsoft\.icon))$/.test(f.type) ||
     /\.(heic|heif|bmp|gif|ico|cur|svg|apng)$/i.test(f.name) || isHeic(f),
   );
   if (!incoming.length) return;
+  if (!isSample && state.sample) {
+    state.files = [];
+    state.animationFiles = [];
+    state.pdfOrder = [];
+  }
+  if (!isSample) state.sample = false;
   state.files = [...state.files, ...incoming];
   state.pdfOrder = state.files;
   inspectAnimations(incoming).then((found) => {
@@ -649,9 +677,26 @@ function addFiles(list) {
     ? "unlimited jobs today"
     : `${Math.max(0, entitlement.tasksPerDay - entitlement.tasksUsed)} jobs left today`;
   $("#file-summary").innerHTML =
-    `<span>${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}</span><div id="animation-warning"></div>`;
+    `<span>${state.sample ? "Bundled sample · " : ""}${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}${state.sample ? ' · <button class="text-button clear-sample" type="button">Clear sample</button>' : ""}</span><div id="animation-warning"></div>`;
+  $(".clear-sample")?.addEventListener("click", clearFiles);
   $("#controls").hidden = false;
   renderControls();
+}
+function clearFiles() {
+  state.files = [];
+  state.sample = false;
+  state.animationFiles = [];
+  state.pdfOrder = [];
+  state.results = [];
+  $("#file-input").value = "";
+  $("#folder-input").value = "";
+  $("#file-summary").hidden = true;
+  $("#controls").hidden = true;
+  $("#results").hidden = false;
+  $("#result-list").innerHTML = "";
+  $("#result-summary").textContent = "";
+  setProgress(0, 0);
+  $("#run-status").textContent = "";
 }
 async function inspectAnimations(files) {
   const found = [];
@@ -1454,7 +1499,7 @@ function outputExtension(mime) {
   if (mime === "image/x-icon") return "ico";
   return Object.values(MIME).find((x) => x.mime === mime)?.ext || "png";
 }
-async function preflight(files) {
+async function preflight(files, isSample = false) {
   const foundAnimations = await inspectAnimations(files);
   if (foundAnimations.length) {
     state.animationFiles = [...new Set([...state.animationFiles, ...foundAnimations])];
@@ -1490,7 +1535,7 @@ async function preflight(files) {
     if (files.length > 25)
       return `iPhone/iPad safety limit: this ${files.length}-file batch is too large for reliable mobile memory. Process 25 files or fewer at a time.`;
   }
-  if (!canUseTool(state.tool, {fileCount: files.length, task: true}))
+  if (!isSample && !canUseTool(state.tool, {fileCount: files.length, task: true}))
     return limitMessage(state.tool, {fileCount: files.length, task: true});
   return "";
 }
@@ -1501,7 +1546,7 @@ function uniqueName(name, used) {
   const dot = name.lastIndexOf(".");
   return `${name.slice(0, dot)}-${count + 1}${name.slice(dot)}`;
 }
-async function run(runFiles = state.files) {
+async function run(runFiles = state.files, isSample = false) {
   if (state.tool === "background-removal") {
     const status = $("#run-status");
     status.textContent = "Use the background-removal controls below.";
@@ -1514,7 +1559,7 @@ async function run(runFiles = state.files) {
     $("#run-status").textContent = "Choose at least one image first.";
     return;
   }
-  const preflightMessage = await preflight(runFiles);
+  const preflightMessage = await preflight(runFiles, isSample);
   if (preflightMessage) {
     $("#run-status").textContent = preflightMessage;
     return;
@@ -1604,7 +1649,7 @@ async function run(runFiles = state.files) {
     Array.from({ length: Math.min(PRODUCT.concurrency, tasks.length) }, worker),
   );
   state.results = outputs;
-  recordTask();
+  if (!isSample) recordTask();
   renderResults();
   setProgress(done, tasks.length);
   if (returnFocus) $("#result-list .result-download, #result-list .retry-result")?.focus();
@@ -1616,12 +1661,34 @@ async function run(runFiles = state.files) {
   button.textContent = "Process images";
   const failed = outputs.filter((result) => result.error).length;
   const succeeded = outputs.length - failed;
+  const summary = resultSummary(outputs);
+  $("#result-summary").textContent = isSample
+    ? `Sample complete — ${summary} This run does not count against your daily allowance.`
+    : summary;
   $("#run-status").textContent = state.cancel
     ? `Cancelled after ${done} output${done === 1 ? "" : "s"}.`
     : failed
       ? `Finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. Failed files remain below; retry them individually.`
       : `Finished ${done} output${done === 1 ? "" : "s"}.`;
   state.cancel = false;
+}
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+function resultSummary(outputs) {
+  const good = outputs.filter((result) => result.bytes);
+  const input = good.reduce((sum, result) => sum + (result.originalBytes || 0), 0);
+  const output = good.reduce((sum, result) => sum + result.bytes.byteLength, 0);
+  const failed = outputs.length - good.length;
+  if (!good.length) return `${failed} file${failed === 1 ? "" : "s"} failed.`;
+  const delta = input - output;
+  const percent = input ? Math.abs((delta / input) * 100).toFixed(1) : "0.0";
+  const change = delta >= 0
+    ? `${formatBytes(delta)} saved (${percent}% smaller)`
+    : `${formatBytes(Math.abs(delta))} larger (${percent}% larger)`;
+  return `${good.length} output${good.length === 1 ? "" : "s"} · ${formatBytes(input)} in → ${formatBytes(output)} out · ${change}${failed ? ` · ${failed} failed` : ""}. Download below.`;
 }
 async function runPdfWorkspace(runFiles) {
   const message = await preflight(runFiles);
@@ -1756,6 +1823,7 @@ async function runRecipe() {
     state.results = outputs;
     recordTask();
     renderResults();
+    $("#result-summary").textContent = resultSummary(outputs);
     setProgress(files.length, files.length);
     if (returnFocus) $("#result-list .result-download, #result-list .retry-result")?.focus();
     const failed = outputs.filter((result) => result.error).length;

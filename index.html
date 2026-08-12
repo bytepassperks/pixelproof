@@ -52,6 +52,30 @@
       </div>
     </section>
 
+    <section class="proof-compare landing-section" aria-labelledby="proof-compare-title">
+      <div class="section-heading">
+        <p class="eyebrow">SEE THE TRADE-OFF</p>
+        <h2 id="proof-compare-title">Same subject. Fewer bytes.</h2>
+        <p>Drag the split or use the arrow keys. Both files are real PixelProof artifacts, so the numbers below are the bytes you can inspect and download.</p>
+      </div>
+      <div class="proof-compare-card">
+        <div class="proof-compare-stage" id="proof-compare-stage">
+          <figure class="proof-compare-panel proof-compare-original">
+            <img src="./vendor/images/pixelproof-cat-cutout.webp" alt="Original PixelProof sample cat image with a soft fur edge on transparency">
+            <figcaption><span>ORIGINAL</span><strong>60,778 bytes · 735 × 768 · WEBP</strong></figcaption>
+          </figure>
+          <figure class="proof-compare-panel proof-compare-output" id="proof-compare-output">
+            <img src="./vendor/images/pixelproof-comparison-compressed.webp" alt="PixelProof compressed sample cat image with its soft fur edge preserved">
+            <figcaption><span>PIXELPROOF OUTPUT</span><strong>39,984 bytes · 662 × 691 · WEBP</strong></figcaption>
+          </figure>
+          <div class="proof-compare-divider" aria-hidden="true"></div>
+          <input id="proof-compare-slider" type="range" min="0" max="100" value="50" aria-label="Compare original and PixelProof compressed output">
+        </div>
+        <div class="proof-compare-legend" aria-hidden="true"><span>ORIGINAL · 60,778 bytes</span><span>PIXELPROOF OUTPUT · 39,984 bytes</span></div>
+        <p class="proof-compare-note mono">20,794 bytes saved · 34.2% smaller · measured from the shipped files</p>
+      </div>
+    </section>
+
     <section class="trust-strip"><span>FILES STAY IN YOUR BROWSER</span><span>NO SERVER-SIDE IMAGE PROCESSING</span><span>LOCAL WORKER PIPELINE</span></section>
 
     <section id="tools" class="landing-section tools-section">

@@ -55,3 +55,32 @@ const state = getEntitlementState();
 if (state.tier !== 'free') {
   status.textContent = `${state.label} is active on this browser.`;
 }
+
+const compareStage = document.querySelector('#proof-compare-stage');
+const compareSlider = document.querySelector('#proof-compare-slider');
+const compareOutput = document.querySelector('#proof-compare-output');
+if (compareStage && compareSlider && compareOutput) {
+  let dragging = false;
+  const updateComparison = (value) => {
+    const position = Math.max(0, Math.min(100, Number(value) || 0));
+    compareSlider.value = String(position);
+    compareOutput.style.clipPath = `inset(0 0 0 ${position}%)`;
+  };
+  const valueFromPoint = (event) => {
+    const rect = compareStage.getBoundingClientRect();
+    return ((event.clientX - rect.left) / rect.width) * 100;
+  };
+  compareSlider.addEventListener('input', (event) => updateComparison(event.target.value));
+  compareStage.addEventListener('pointerdown', (event) => {
+    if (event.target === compareSlider || window.matchMedia('(max-width: 600px)').matches) return;
+    dragging = true;
+    compareStage.setPointerCapture?.(event.pointerId);
+    updateComparison(valueFromPoint(event));
+  });
+  compareStage.addEventListener('pointermove', (event) => {
+    if (dragging) updateComparison(valueFromPoint(event));
+  });
+  compareStage.addEventListener('pointerup', () => { dragging = false; });
+  compareStage.addEventListener('pointercancel', () => { dragging = false; });
+  updateComparison(compareSlider.value);
+}

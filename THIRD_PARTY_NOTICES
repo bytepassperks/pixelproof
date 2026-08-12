@@ -18,6 +18,13 @@ converted through PixelProof's own tools to a 735 × 768 WebP with alpha
 vendor/images/pixelproof-cat-cutout.webp. No external image request is
 made at runtime.
 
+The landing-page comparison also ships a 39,984-byte, 662 × 691 WebP
+generated from that vendored sample by PixelProof's target-size compression
+workflow (40,000-byte budget, dimensions reduced when needed). It is stored
+at vendor/images/pixelproof-comparison-compressed.webp. The displayed
+60,778-byte original and 39,984-byte output values are the exact shipped
+file sizes.
+
 PixelProof Phase 2 model provenance
 
 EfficientSAM-Ti
