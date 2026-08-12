@@ -42,6 +42,7 @@ assets=(
   vendor/images/pixelproof-dog-hero-1024.webp
   vendor/images/pixelproof-dog-hero-512.webp
   vendor/images/pixelproof-sample-photo-cutout.png
+vendor/images/pixelproof-comparison-cutout.webp
   vendor/images/pixelproof-sample-photo.jpg
   vendor/images/pixelproof-comparison-photo.jpg
   404.html
