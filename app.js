@@ -710,7 +710,8 @@ function relativePath(file) {
   return safe.join("/") || "image";
 }
 function field(label, html, wide = "") {
-  return `<div class="field ${wide}"><label>${label}</label>${html}</div>`;
+  const controlId = html.match(/\bid="([^"]+)"/)?.[1];
+  return `<div class="field ${wide}"><label${controlId ? ` for="${controlId}"` : ""}>${label}</label>${html}</div>`;
 }
 async function inputFormatPreference(file) {
   if (
@@ -997,7 +998,7 @@ function mountPresetControls() {
     row = document.createElement("div");
     row.id = "preset-actions";
     row.className = "preset-actions";
-    row.innerHTML = '<button class="text-button" id="save-preset">Save settings</button><select id="saved-preset"><option value="">Apply saved preset…</option></select><button class="text-button" id="export-preset">Export pipeline</button><button class="text-button" id="import-preset">Import pipeline</button><input id="import-preset-file" type="file" accept="application/json,.json" hidden>';
+    row.innerHTML = '<button class="text-button" id="save-preset">Save settings</button><select id="saved-preset" aria-label="Apply saved preset"><option value="">Apply saved preset…</option></select><button class="text-button" id="export-preset">Export pipeline</button><button class="text-button" id="import-preset">Import pipeline</button><input id="import-preset-file" type="file" accept="application/json,.json" hidden>';
     $("#control-content").append(row);
   }
   const select = $("#saved-preset");
