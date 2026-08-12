@@ -2002,7 +2002,6 @@ function renderResults() {
         event.dataTransfer?.setData("text/uri-list", url);
         event.dataTransfer.effectAllowed = "copy";
       });
-      if (r.sourcePath) row.querySelector("figcaption span").textContent += ` · ${r.sourcePath}`;
     } else {
       row.innerHTML = `<div class="result-failure"><strong>${escapeHtml(r.sourcePath || r.source)}</strong><span class="error">${escapeHtml(r.error)}</span><button class="text-button retry-result">Retry this file</button></div>`;
       row.querySelector(".retry-result").onclick = () => r.file && run([r.file]);
