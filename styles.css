@@ -169,7 +169,8 @@ body{background:var(--darkroom);color:var(--paper)}
 .landing .tools-section .section-heading h2{font-size:clamp(30px,4vw,54px)}
 .landing .comparison{background:var(--darkroom-deep);max-width:none;overflow:hidden}
 .landing .comparison .section-heading h2{color:var(--amber-bright);font-size:clamp(38px,5.5vw,78px)}
-.landing .comparison-wrap{border-top:1px solid var(--rule);margin-top:60px;max-width:100%;min-width:0;overflow-x:auto;width:100%}
+.landing .comparison-wrap{border-top:1px solid var(--rule);contain:paint;display:block;margin-top:60px;max-width:100%;min-width:0;overflow-x:auto;width:100%}
+.landing .comparison{min-width:0;width:100%}
 .landing .comparison th,.landing .comparison td{padding:20px 16px}
 .landing .comparison th:first-child{color:var(--paper)}
 .landing .comparison td:first-child{color:var(--paper)}
