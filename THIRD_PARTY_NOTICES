@@ -18,11 +18,14 @@ converted through PixelProof's own tools to a 735 × 768 WebP with alpha
 vendor/images/pixelproof-cat-cutout.webp. No external image request is
 made at runtime.
 
-The landing background-removal comparison uses the same PixelProof output
-placed on a transparent 1,600 × 1,064 canvas so both comparison artifacts
-share identical pixel dimensions. It is stored at
-vendor/images/pixelproof-background-removal-cutout.png and is 582,755 bytes.
-The underlying source and output provenance are the Pexels record above.
+The landing background-removal comparison uses the same 1,600 × 1,064
+photograph as the bundled sample. PixelProof ran that photograph through its
+own click-to-select and continuous-alpha matting workflow, then quantized the
+transparent PNG for display without changing its dimensions. The result is
+stored at vendor/images/pixelproof-sample-photo-cutout.png and is 441,862
+bytes. The shipped original is vendor/images/pixelproof-sample-photo.jpg at
+298,514 bytes; both artifacts are pixel-aligned and derived from the same
+CC0 photograph above.
 
 The immersive comparison and bundled workbench sample use a photograph of a
 white, orange, and gray tabby cat lying on gray textile, originally published
