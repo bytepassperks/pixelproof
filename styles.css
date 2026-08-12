@@ -410,7 +410,12 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
   margin-top:20px
 }
 .proof-compare-stage{
-  max-height:600px
+  max-height:720px
+}
+.proof-compare-copy{
+  align-content:start;
+  gap:var(--space-4);
+  min-height:0
 }
 @media(max-width:600px){
   .landing .hero{
