@@ -339,3 +339,22 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 /* Upload surface keeps the focus target available without decorative empty marks. */
 .app-shell .skip-link:not(:focus){clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}
 .app-shell .dropzone::before,.app-shell .dropzone::after{display:none}
+.landing .mock-image{
+  aspect-ratio:1024 / 1152;
+  height:auto;
+  max-height:320px
+}
+.landing .mock-image img{
+  object-fit:contain
+}
+.proof-compare-stage{
+  max-height:760px
+}
+@media(max-width:600px){
+  .landing .mock-image{
+    max-height:220px
+  }
+  .proof-compare-stage{
+    max-height:520px
+  }
+}
