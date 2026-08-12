@@ -264,9 +264,16 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .app-shell .file-summary{border-left:3px solid var(--darkroom);line-height:1.45}
 .app-shell .run-row{min-height:58px}
 .app-shell #run-status,.app-shell #recipe-status{display:block;line-height:1.5;min-height:1.5em}
+.app-shell .run-progress{background:var(--darkroom);border:1px solid var(--rule);display:block;height:8px;min-width:110px;overflow:hidden;position:relative;width:clamp(110px,18%,180px)}
+.app-shell .run-progress i{background:var(--amber);display:block;height:100%;transition:width .24s ease;width:0}
+.app-shell .empty-results{border:1px dashed var(--rule);color:var(--paper-dim);display:grid;gap:var(--space-2);line-height:1.5;padding:var(--space-6);text-align:center}
+.app-shell .empty-results strong{color:var(--paper);font:650 16px var(--ui-face)}
+.app-shell .empty-results span{font:12px var(--data-face)}
+.app-shell .results:has(#result-list > *) .empty-results{display:none}
 .app-shell .progress{border:1px solid var(--rule);height:6px;margin-top:var(--space-3)}
 .app-shell .progress i{transition:width .24s ease}
 .app-shell .result-frame:hover{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+.app-shell .result-frame{animation:result-arrive .3s ease both;animation-delay:calc(var(--result-index,0) * 60ms)}
 .app-shell .result-download:hover:not(:disabled){background:var(--amber);border-color:var(--amber);color:var(--darkroom);box-shadow:4px 4px 0 var(--rust)}
 .app-shell .result-failure{border-left:3px solid #ff9b83;padding-left:var(--space-3)}
 .app-shell dialog{padding:var(--space-6);max-height:min(720px,calc(100vh - 40px));overflow:auto}
@@ -278,5 +285,6 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .activation-page .activation-card input:focus-visible{box-shadow:0 0 0 3px var(--darkroom),0 0 0 5px var(--amber);outline:0}
 .landing.policy-page .policy-card h2{line-height:1.05}
 .landing.policy-page .policy-card p{max-width:68ch}
-@media(prefers-reduced-motion:reduce){button,.btn,.tool-link,.text-button,select,input,textarea,summary,.result-frame,.dropzone,.landing-card,.price-card,details{transition:none}.app-shell .progress i{transition:none}}
-@media(max-width:600px){.app-shell .recipe-panel,.app-shell .controls,.app-shell .results{padding:var(--space-5) var(--space-4)}.app-shell .recipe-toolbar{align-items:stretch;display:grid;grid-template-columns:1fr 1fr}.app-shell .recipe-toolbar select{grid-column:1/-1}.app-shell .recipe-toolbar .text-button{min-height:36px}.app-shell .run-row{align-items:flex-start;flex-direction:column;gap:var(--space-2)}.app-shell dialog{padding:var(--space-5)}}
+@media(prefers-reduced-motion:reduce){button,.btn,.tool-link,.text-button,select,input,textarea,summary,.result-frame,.dropzone,.landing-card,.price-card,details{transition:none}.app-shell .progress i,.app-shell .run-progress i{transition:none}.app-shell .result-frame{animation:none}}
+@keyframes result-arrive{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(max-width:600px){.app-shell .recipe-panel,.app-shell .controls,.app-shell .results{padding:var(--space-5) var(--space-4)}.app-shell .recipe-toolbar{align-items:stretch;display:grid;grid-template-columns:1fr 1fr}.app-shell .recipe-toolbar select{grid-column:1/-1}.app-shell .recipe-toolbar .text-button{min-height:36px}.app-shell .run-row{align-items:flex-start;flex-direction:column;gap:var(--space-2)}.app-shell .run-progress{min-width:0;width:100%}.app-shell dialog{padding:var(--space-5)}}

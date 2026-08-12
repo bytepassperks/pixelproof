@@ -1369,7 +1369,16 @@ function friendlyError(error) {
   const message = String(error?.message || error || "Unknown image-processing error.");
   if (/could not be decoded|decode|invalidstateerror/i.test(message))
     return "This file could not be decoded as a supported image. Check that it is a real JPEG, PNG, WebP, HEIC/HEIF, BMP, GIF, ICO, or SVG file.";
-  return message;
+  if (/worker failed|failed to fetch|network|out of memory|memory/i.test(message))
+    return "PixelProof could not finish this file in the browser. Try again, or use a smaller image.";
+  return "PixelProof could not finish this file in the browser. Try again or choose a smaller, supported image.";
+}
+function setProgress(done, total) {
+  const progress = $("#run-progress");
+  if (!progress) return;
+  const percent = total ? Math.round((done * 100) / total) : 0;
+  progress.setAttribute("aria-valuenow", String(percent));
+  progress.querySelector("i").style.width = `${percent}%`;
 }
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({
@@ -1548,11 +1557,13 @@ async function run(runFiles = state.files) {
   tasks.forEach((task, index) => {
     task.sequence = index + 1;
   });
+  setProgress(0, tasks.length);
+  const returnFocus = document.activeElement === button;
   const worker = async () => {
     while (cursor < tasks.length && !state.cancel) {
       const task = tasks[cursor++];
       $("#run-status").textContent =
-        `Processing ${done + 1} of ${tasks.length}…`;
+        `Processing ${done + 1} of ${tasks.length}: ${task.file.name} · ${done} finished · ${tasks.length - done - 1} remaining`;
       try {
         const result = await processOne(task.file, task.op);
         outputs.push({
@@ -1577,6 +1588,7 @@ async function run(runFiles = state.files) {
         });
       }
       done++;
+      setProgress(done, tasks.length);
     }
   };
   await Promise.all(
@@ -1585,6 +1597,8 @@ async function run(runFiles = state.files) {
   state.results = outputs;
   recordTask();
   renderResults();
+  setProgress(done, tasks.length);
+  if (returnFocus) $("#result-list .result-download, #result-list .retry-result")?.focus();
   if (state.tool === "icon-set") {
     $("#icon-snippet").textContent = `<link rel="icon" href="/favicon.ico" sizes="32x32">\n<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">\n<link rel="apple-touch-icon" href="/apple-touch-icon.png">\n<link rel="manifest" href="/site.webmanifest">\n\n{\n  "icons": [\n    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},\n    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}\n  ]\n}`;
   }
@@ -1596,7 +1610,7 @@ async function run(runFiles = state.files) {
   $("#run-status").textContent = state.cancel
     ? `Cancelled after ${done} output${done === 1 ? "" : "s"}.`
     : failed
-      ? `Finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. See the output rows for next steps.`
+      ? `Finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. Failed files remain below; retry them individually.`
       : `Finished ${done} output${done === 1 ? "" : "s"}.`;
   state.cancel = false;
 }
@@ -1608,10 +1622,12 @@ async function runPdfWorkspace(runFiles) {
   try {
     const ordered = state.pdfOrder.length ? state.pdfOrder : runFiles;
     const images = [];
+    setProgress(0, ordered.length);
     for (const file of ordered) {
       $("#run-status").textContent = `Preparing ${images.length + 1} of ${ordered.length} for PDF…`;
       const encoded = await imageForPdf(file, {width: Number($("#svgWidth")?.value || 1200), height: Number($("#svgHeight")?.value || 1200)});
       images.push({...encoded, source: file});
+      setProgress(images.length, ordered.length);
     }
     const pageSize = $("#pdfSize").value;
     const output = $("#pdfOutput").value;
@@ -1631,6 +1647,7 @@ async function runPdfWorkspace(runFiles) {
       state.results = [{name: "pixelproof-images.pdf", bytes, mime: "application/pdf", source: `${images.length} images`, originalBytes: runFiles.reduce((sum, file) => sum + file.size, 0)}];
     }
     renderResults();
+    setProgress(1, 1);
     const total = state.results.reduce((sum, result) => sum + result.bytes.byteLength, 0);
     $("#run-status").textContent = `PDF ready: ${Math.round(total / 1024)} KB across ${state.results.length} file${state.results.length === 1 ? "" : "s"}.`;
     recordTask();
@@ -1647,10 +1664,12 @@ async function runIdPrintSheet(runFiles) {
   const profiles = {us: [51, 51], ca: [50, 70], uk: [35, 45]};
   const papers = {"4x6": [152.4, 101.6], a4: [210, 297]};
   const [photoW, photoH] = profiles[$("#idProfile").value], [paperW, paperH] = papers[$("#idPaper").value];
+  setProgress(0, 1);
   const image = await imageForPdf(file);
   const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, Number($("#idCopies").value || 1));
   state.results = [{name: `${stem(file.name)}-${$("#idProfile").value}-print-sheet.pdf`, bytes, mime: "application/pdf", source: file.name, originalBytes: file.size}];
   renderResults();
+  setProgress(1, 1);
   $("#run-status").textContent = `Print sheet ready: ${photoW}×${photoH} mm photos on ${paperW}×${paperH} mm paper. Dimensions only; review all official requirements yourself.`;
   recordTask();
 }
@@ -1685,6 +1704,8 @@ async function runRecipe() {
   $("#save-folder").hidden = true;
   const outputs = [], usedNames = new Map();
   let completed = 0;
+  setProgress(0, files.length);
+  const returnFocus = document.activeElement === button;
   try {
     for (const file of files) {
       try {
@@ -1706,7 +1727,7 @@ async function runRecipe() {
       } else {
         let input = file, result;
         for (const step of state.recipe.steps) {
-          $("#recipe-status").textContent = `Processing ${completed + 1} of ${files.length}: ${step.label}`;
+          $("#recipe-status").textContent = `Processing file ${completed + 1} of ${files.length}: ${step.label} · ${completed} finished · ${files.length - completed - 1} remaining`;
           result = await processOne(input, {...step.operation, maxPixels: PRODUCT.maxPixels});
           input = new File([result.bytes], `${file.name}.${outputExtension(result.mime)}`, {type: result.mime});
         }
@@ -1716,18 +1737,22 @@ async function runRecipe() {
         rememberOutput(outputs[outputs.length - 1]);
       }
       completed++;
+      setProgress(completed, files.length);
       } catch (error) {
         outputs.push({source: file.name, sourcePath: relativePath(file), file, error: friendlyError(error)});
         completed++;
+        setProgress(completed, files.length);
       }
     }
     state.results = outputs;
     recordTask();
     renderResults();
+    setProgress(files.length, files.length);
+    if (returnFocus) $("#result-list .result-download, #result-list .retry-result")?.focus();
     const failed = outputs.filter((result) => result.error).length;
     const succeeded = outputs.length - failed;
     $("#recipe-status").textContent = failed
-      ? `Recipe finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. Failed files remain below.`
+      ? `Recipe finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. Failed files remain below; retry them individually.`
       : `Recipe complete: ${outputs.length} output${outputs.length === 1 ? "" : "s"}.`;
   } finally {
     state.running = false;
@@ -1766,6 +1791,7 @@ function renderResults() {
   for (const r of state.results) {
     const row = document.createElement("article");
     row.className = "result-frame";
+    row.style.setProperty("--result-index", String(list.children.length));
     if (r.bytes) {
       const url = URL.createObjectURL(new Blob([r.bytes], { type: r.mime }));
       state.urls.push(url);
