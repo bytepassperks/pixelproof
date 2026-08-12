@@ -17,8 +17,8 @@ enabled by default for new background-removal runs.
 
 The landing hero uses responsive WebP derivatives of that same refined
 cutout: vendor/images/pixelproof-dog-hero-1024.webp is 1,024 × 681 and
-37,146 bytes for desktop/retina display, while
-vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 10,686 bytes for
+26,088 bytes for desktop/retina display, while
+vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 8,158 bytes for
 small screens. Both preserve alpha and are generated only from the shipped
 sample/cutout; no separate demo subject is used.
 
