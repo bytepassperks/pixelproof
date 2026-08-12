@@ -76,7 +76,7 @@ if (compareStage && compareSlider && compareOutput && compareDivider && compareH
   };
   const startDrag = (event) => {
     dragging = true;
-    compareStage.setPointerCapture?.(event.pointerId);
+    if (Number.isFinite(event.pointerId)) compareStage.setPointerCapture?.(event.pointerId);
     updateComparison(valueFromPoint(event));
   };
   const moveDrag = (event) => {
