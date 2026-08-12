@@ -40,6 +40,7 @@ assets=(
   favicon.svg
   social-preview.svg
   vendor/images/pixelproof-cat-cutout.webp
+  vendor/images/pixelproof-background-removal-cutout.png
   vendor/images/pixelproof-sample-photo.jpg
   vendor/images/pixelproof-comparison-photo.jpg
   404.html
