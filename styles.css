@@ -304,13 +304,13 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .proof-compare-stage input{appearance:none;background:transparent;cursor:ew-resize;height:100%;left:0;margin:0;position:absolute;top:0;width:100%;z-index:4}
 .proof-compare-stage input::-webkit-slider-thumb{appearance:none;background:var(--amber-bright);border:3px solid var(--darkroom);border-radius:50%;box-shadow:0 0 0 2px var(--amber-bright);height:22px;width:22px}
 .proof-compare-stage input::-moz-range-thumb{background:var(--amber-bright);border:3px solid var(--darkroom);border-radius:50%;height:16px;width:16px}
-.proof-compare-copy{align-content:space-between;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:grid;gap:var(--space-4);min-height:600px;min-width:0;padding:var(--space-5) 0}
+.proof-compare-copy{align-content:start;border-top:1px solid var(--rule);display:grid;gap:var(--space-4);min-height:0;min-width:0;padding:var(--space-5) 0}
 .proof-compare-instruction{color:var(--amber-bright);font-size:13px;margin:0}
 .proof-compare-legend{display:grid;gap:var(--space-3);margin:0;color:var(--paper-dim);font:10px var(--data-face);letter-spacing:.08em}
 .proof-compare-legend span{display:grid;gap:var(--space-1)}
 .proof-compare-legend strong{color:var(--paper);font:12px var(--data-face);font-variant-numeric:tabular-nums;letter-spacing:0}
 .proof-compare-note{color:var(--amber-bright);font-size:12px;margin:0}
-.proof-compare-compression{color:var(--paper-dim);font-size:11px;margin:0}
+.proof-compare-compression{border-bottom:1px solid var(--rule);color:var(--paper-dim);font-size:11px;margin:0;padding-bottom:var(--space-4)}
 .app-shell .sample-action{border-color:var(--amber);color:var(--amber-bright)}
 .app-shell .file-summary{align-items:flex-start;flex-wrap:wrap}
 .app-shell .file-summary>span{min-width:0}
