@@ -248,7 +248,7 @@ export function mountBackgroundTool(container, context) {
       value: "36",
     }),
     bandPreset: element("select"),
-    clean: element("input", { type: "checkbox" }),
+    clean: element("input", { type: "checkbox", checked: true }),
     background: element("select"),
     x: element("input", {type: "number", min: "0", max: "1024", value: "512", "aria-label": "Selection X coordinate"}),
     y: element("input", {type: "number", min: "0", max: "1024", value: "512", "aria-label": "Selection Y coordinate"}),
