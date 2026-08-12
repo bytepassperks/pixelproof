@@ -244,6 +244,7 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .eyebrow,.app-shell .field label,.app-shell .recipe-tool-label span,.app-shell .recipe-field span{letter-spacing:.12em}
 .app-shell .tool-link{border-left:3px solid transparent}
 .app-shell .tool-link:hover{background:var(--sleeve);box-shadow:none;border-left-color:var(--amber)}
+.app-shell .tool-link.busy,.app-shell .tool-link.busy:hover{background:var(--darkroom);border-left-color:var(--rule);box-shadow:none;color:var(--paper-dim);cursor:not-allowed;opacity:.58}
 .app-shell .tool-link.active{background:var(--sleeve);box-shadow:none;border-left-color:var(--amber);font-weight:700}
 .app-shell .tool-link:focus-visible{background:var(--sleeve);box-shadow:0 0 0 3px var(--darkroom),0 0 0 6px var(--amber);outline:0}
 .app-shell .recipe-toolbar{gap:var(--space-3)}

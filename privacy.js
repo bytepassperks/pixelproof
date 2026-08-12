@@ -73,13 +73,21 @@ async function recoveryBytes() {
     request.onerror = () => resolve(0);
     request.onsuccess = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains("outputs")) return resolve(0);
-      const get = db.transaction("outputs", "readonly").objectStore("outputs").getAll();
-      get.onerror = () => resolve(0);
+      if (!db.objectStoreNames.contains("outputs")) {
+        db.close();
+        return resolve(0);
+      }
+      const transaction = db.transaction("outputs", "readonly");
+      const get = transaction.objectStore("outputs").getAll();
+      get.onerror = () => {
+        db.close();
+        resolve(0);
+      };
       get.onsuccess = () => resolve(get.result.reduce((sum, item) => {
         const bytes = item.bytes?.byteLength || item.bytes?.length || 0;
         return sum + bytes;
       }, 0));
+      transaction.oncomplete = () => db.close();
     };
   });
 }
@@ -115,8 +123,22 @@ export async function localDataSummary() {
 export async function clearLocalData(category) {
   if (category === "recovery" || category === "all") {
     await new Promise((resolve) => {
-      const request = indexedDB.deleteDatabase(RECOVERY_DB);
-      request.onsuccess = request.onerror = request.onblocked = () => resolve();
+      const request = indexedDB.open(RECOVERY_DB);
+      request.onerror = () => resolve();
+      request.onsuccess = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains("outputs")) {
+          db.close();
+          resolve();
+          return;
+        }
+        const transaction = db.transaction("outputs", "readwrite");
+        transaction.objectStore("outputs").clear();
+        transaction.oncomplete = transaction.onerror = () => {
+          db.close();
+          resolve();
+        };
+      };
     });
   }
   if (category === "models" || category === "all") {

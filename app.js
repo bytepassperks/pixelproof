@@ -188,6 +188,9 @@ const state = {
   cancel: false,
   faceBoxes: [],
   faceScale: {x: 1, y: 1},
+  compareUrls: [],
+  activeRunId: "",
+  activeRunStartedAt: 0,
   recipe: null,
   retryFiles: [],
   pdfOrder: [],
@@ -200,6 +203,7 @@ const RECIPE_KEY = "pixelproof-recipes";
 const SETTINGS_KEY = "pixelproof-tool-settings";
 const RECOVERY_DB = "pixelproof-recovery";
 const IOS_PIXEL_LIMIT = 24_000_000;
+let recoveryWrites = Promise.resolve();
 const recipes = [
   {
     id: "web",
@@ -279,14 +283,19 @@ function isIOS() {
 }
 function recoveryStore(mode, value) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(RECOVERY_DB, 1);
+    const request = indexedDB.open(RECOVERY_DB);
     request.onupgradeneeded = () => request.result.createObjectStore("outputs", {keyPath: "id"});
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
-      const transaction = request.result.transaction("outputs", mode);
+      const db = request.result;
+      const transaction = db.transaction("outputs", mode === "clear" ? "readwrite" : mode);
       transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => resolve();
-      if (mode === "readwrite") transaction.objectStore("outputs").put(value);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      if (mode === "clear") transaction.objectStore("outputs").clear();
+      else if (mode === "readwrite") transaction.objectStore("outputs").put(value);
       else {
         const get = transaction.objectStore("outputs").getAll();
         get.onsuccess = () => resolve(get.result);
@@ -296,29 +305,43 @@ function recoveryStore(mode, value) {
 }
 async function rememberOutput(result) {
   if (!result?.bytes) return;
-  try {
-    await recoveryStore("readwrite", {
-      id: `${Date.now()}-${Math.random()}`,
-      name: result.name,
-      source: result.source || "",
-      sourcePath: result.sourcePath || "",
-      mime: result.mime,
-      bytes: result.bytes,
-      originalBytes: result.originalBytes || 0,
-      savedAt: Date.now(),
-    });
-  } catch {}
+  recoveryWrites = recoveryWrites.then(async () => {
+    try {
+      await recoveryStore("readwrite", {
+        id: `${Date.now()}-${Math.random()}`,
+        name: result.name,
+        source: result.source || "",
+        sourcePath: result.sourcePath || "",
+        mime: result.mime,
+        bytes: result.bytes,
+        originalBytes: result.originalBytes || 0,
+        savedAt: Date.now(),
+        runId: result.runId || "",
+        runStartedAt: result.runStartedAt || Date.now(),
+      });
+    } catch {}
+  });
+  return recoveryWrites;
+}
+function clearRecoveryOutputs() {
+  return recoveryStore("clear");
 }
 async function restoreRecovery() {
   try {
     const saved = await recoveryStore("readonly");
     if (!saved?.length || state.results.length) return;
-    const recent = saved.filter((item) => Date.now() - item.savedAt < 24 * 60 * 60 * 1000);
+    const recent = saved.filter((item) =>
+      item.runId &&
+      Date.now() - item.savedAt < 24 * 60 * 60 * 1000,
+    );
     if (!recent.length) return;
-    state.results = recent.map((item) => ({...item, bytes: item.bytes}));
+    const latestRun = recent.reduce((latest, item) =>
+      !latest || item.runStartedAt > latest ? item.runStartedAt : latest, 0);
+    const recovered = recent.filter((item) => item.runStartedAt === latestRun);
+    state.results = recovered.map((item) => ({...item, bytes: item.bytes}));
     $("#results").hidden = false;
     renderResults();
-    const recoveryMessage = `${recent.length} completed output${recent.length === 1 ? "" : "s"} recovered from your last interrupted job.`;
+    const recoveryMessage = `${recovered.length} completed output${recovered.length === 1 ? "" : "s"} recovered from your last interrupted job.`;
     const status = $("#run-status") || $("#recipe-status");
     if (status) {
       status.textContent = recoveryMessage;
@@ -631,6 +654,14 @@ $("#reset-tool").onclick = () => {
 $("#run-button").onclick = () =>
   state.running ? (state.cancel = true) : run();
 function selectTool(id) {
+  if (state.running) {
+    state.cancel = true;
+    const current = toolDefs.find((tool) => tool.id === state.tool);
+    $("#run-status").textContent = `${current?.label || "The current tool"} is still running. Use Cancel current job to stop it before switching tools.`;
+    $("#run-button").focus();
+    return;
+  }
+  revokeResultUrls();
   state.tool = id;
   state.results = [];
   $("#run-status").textContent = "";
@@ -655,9 +686,13 @@ function addFiles(list, isSample = false) {
   const incoming = [...list].filter((f) =>
     /^image\/(jpeg|png|webp|bmp|gif|svg\+xml|apng)$/.test(f.type) ||
     /^(image\/(x-icon|vnd\.microsoft\.icon))$/.test(f.type) ||
-    /\.(heic|heif|bmp|gif|ico|cur|svg|apng)$/i.test(f.name) || isHeic(f),
+    /\.(heic|heif|bmp|gif|ico|cur|svg|apng)$/i.test(f.name) || isHeic(f) ||
+    (f.size > 0 && !f.name.includes(".")),
   );
-  if (!incoming.length) return;
+  if (!incoming.length) {
+    $("#run-status").textContent = "No supported image files were added. Choose a non-empty JPEG, PNG, WebP, HEIC/HEIF, BMP, GIF, ICO, or SVG file.";
+    return;
+  }
   if (!isSample && state.sample) {
     state.files = [];
     state.animationFiles = [];
@@ -683,6 +718,7 @@ function addFiles(list, isSample = false) {
   renderControls();
 }
 function clearFiles() {
+  revokeResultUrls();
   state.files = [];
   state.sample = false;
   state.animationFiles = [];
@@ -697,6 +733,26 @@ function clearFiles() {
   $("#result-summary").textContent = "";
   setProgress(0, 0);
   $("#run-status").textContent = "";
+}
+function revokeResultUrls() {
+  state.urls.splice(0).forEach((url) => URL.revokeObjectURL(url));
+  state.compareUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
+}
+function setRunBusy(busy) {
+  const current = toolDefs.find((tool) => tool.id === state.tool);
+  document.querySelectorAll(".tool-link").forEach((link) => {
+    link.disabled = busy;
+    link.setAttribute("aria-disabled", String(busy));
+    link.classList.toggle("busy", busy);
+    if (busy) link.title = `${current?.label || "Current tool"} is running. Cancel the job before switching tools.`;
+    else link.removeAttribute("title");
+  });
+  const button = $("#run-button");
+  if (!button) return;
+  button.textContent = busy ? "Cancel current job" : "Process images";
+  button.setAttribute("aria-label", busy
+    ? `Cancel current ${current?.label || "image"} job`
+    : `Run ${current?.label || "image"} job`);
 }
 async function inspectAnimations(files) {
   const found = [];
@@ -718,7 +774,36 @@ function hasChunk(bytes, text) {
 }
 function countGifFrames(bytes) {
   let frames = 0;
-  for (let index = 0; index < bytes.length - 1; index++) if (bytes[index] === 0x2c) frames++;
+  let index = 13;
+  if (bytes.length < 13) return 0;
+  const packed = bytes[10];
+  index += packed & 0x80 ? 3 * (2 ** ((packed & 0x07) + 1)) : 0;
+  const skipSubBlocks = () => {
+    while (index < bytes.length) {
+      const size = bytes[index++];
+      if (!size) break;
+      index += size;
+    }
+  };
+  while (index < bytes.length) {
+    if (bytes[index] === 0x2c) {
+      frames++;
+      if (frames > 1) return frames;
+      index += 10;
+      if (index > bytes.length) break;
+      const localPacked = bytes[index - 1];
+      if (localPacked & 0x80) index += 3 * (2 ** ((localPacked & 0x07) + 1));
+      index++;
+      skipSubBlocks();
+    } else if (bytes[index] === 0x21) {
+      index += 2;
+      skipSubBlocks();
+    } else if (bytes[index] === 0x3b) {
+      break;
+    } else {
+      index++;
+    }
+  }
   return frames;
 }
 function renderAnimationWarning() {
@@ -1572,7 +1657,9 @@ async function run(runFiles = state.files, isSample = false) {
   const button = $("#run-button");
   state.running = true;
   state.cancel = false;
-  button.textContent = "Cancel";
+  state.activeRunId = crypto.randomUUID();
+  state.activeRunStartedAt = Date.now();
+  setRunBusy(true);
   state.results = [];
   $("#results").hidden = false;
   $("#result-list").innerHTML = "";
@@ -1628,6 +1715,8 @@ async function run(runFiles = state.files, isSample = false) {
           file: task.file,
           originalBytes: task.file.size,
           originalStats: originalStats.get(task.file),
+          runId: state.activeRunId,
+          runStartedAt: state.activeRunStartedAt,
         });
         rememberOutput(outputs[outputs.length - 1]);
       } catch (error) {
@@ -1648,6 +1737,7 @@ async function run(runFiles = state.files, isSample = false) {
   await Promise.all(
     Array.from({ length: Math.min(PRODUCT.concurrency, tasks.length) }, worker),
   );
+  await recoveryWrites;
   state.results = outputs;
   if (!isSample) recordTask();
   renderResults();
@@ -1658,7 +1748,7 @@ async function run(runFiles = state.files, isSample = false) {
   }
   if (state.tool === "compare") renderCompare(outputs[0]);
   state.running = false;
-  button.textContent = "Process images";
+  setRunBusy(false);
   const failed = outputs.filter((result) => result.error).length;
   const succeeded = outputs.length - failed;
   const summary = resultSummary(outputs);
@@ -1694,7 +1784,11 @@ async function runPdfWorkspace(runFiles) {
   const message = await preflight(runFiles);
   if (message) { $("#run-status").textContent = message; return; }
   const button = $("#run-button");
-  state.running = true; button.disabled = true; $("#results").hidden = false; $("#result-list").innerHTML = "";
+  state.running = true;
+  state.activeRunId = crypto.randomUUID();
+  state.activeRunStartedAt = Date.now();
+  setRunBusy(true);
+  button.disabled = true; $("#results").hidden = false; $("#result-list").innerHTML = "";
   try {
     const ordered = state.pdfOrder.length ? state.pdfOrder : runFiles;
     const images = [];
@@ -1730,7 +1824,7 @@ async function runPdfWorkspace(runFiles) {
   } catch (error) {
     state.results = [{source: "PDF export", error: friendlyError(error)}]; renderResults();
     $("#run-status").textContent = `PDF export failed: ${friendlyError(error)}`;
-  } finally { state.running = false; button.disabled = false; }
+  } finally { state.running = false; setRunBusy(false); button.disabled = false; }
 }
 async function runIdPrintSheet(runFiles) {
   const message = await preflight(runFiles.slice(0, 1));
@@ -1739,15 +1833,24 @@ async function runIdPrintSheet(runFiles) {
   if (!file) return;
   const profiles = {us: [51, 51], ca: [50, 70], uk: [35, 45]};
   const papers = {"4x6": [152.4, 101.6], a4: [210, 297]};
-  const [photoW, photoH] = profiles[$("#idProfile").value], [paperW, paperH] = papers[$("#idPaper").value];
-  setProgress(0, 1);
-  const image = await imageForPdf(file);
-  const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, Number($("#idCopies").value || 1));
-  state.results = [{name: `${stem(file.name)}-${$("#idProfile").value}-print-sheet.pdf`, bytes, mime: "application/pdf", source: file.name, originalBytes: file.size}];
-  renderResults();
-  setProgress(1, 1);
-  $("#run-status").textContent = `Print sheet ready: ${photoW}×${photoH} mm photos on ${paperW}×${paperH} mm paper. Dimensions only; review all official requirements yourself.`;
-  recordTask();
+  state.running = true;
+  state.activeRunId = crypto.randomUUID();
+  state.activeRunStartedAt = Date.now();
+  setRunBusy(true);
+  try {
+    const [photoW, photoH] = profiles[$("#idProfile").value], [paperW, paperH] = papers[$("#idPaper").value];
+    setProgress(0, 1);
+    const image = await imageForPdf(file);
+    const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, Number($("#idCopies").value || 1));
+    state.results = [{name: `${stem(file.name)}-${$("#idProfile").value}-print-sheet.pdf`, bytes, mime: "application/pdf", source: file.name, originalBytes: file.size}];
+    renderResults();
+    setProgress(1, 1);
+    $("#run-status").textContent = `Print sheet ready: ${photoW}×${photoH} mm photos on ${paperW}×${paperH} mm paper. Dimensions only; review all official requirements yourself.`;
+    recordTask();
+  } finally {
+    state.running = false;
+    setRunBusy(false);
+  }
 }
 async function generateIdSheet(image, photoW, photoH, paperW, paperH, copies) {
   const worker = new Worker("./pdf-worker.js");
@@ -1773,6 +1876,8 @@ async function runRecipe() {
   const button = $("#recipe-run");
   button.disabled = true;
   state.running = true;
+  state.activeRunId = crypto.randomUUID();
+  setRunBusy(true);
   state.results = [];
   $("#results").hidden = false;
   $("#result-list").innerHTML = "";
@@ -1797,7 +1902,7 @@ async function runRecipe() {
           const suffix = step.variants[0];
           const directory = relativePath(file).split("/").slice(0, -1).join("/");
           const name = `${stem(file.name)}-${suffix}.${outputExtension(result.mime)}`;
-          outputs.push({...result, name: uniqueName(directory ? `${directory}/${name}` : name, usedNames), source: file.name, sourcePath: relativePath(file), file, originalBytes: file.size, originalStats: originalStats.get(file)});
+          outputs.push({...result, name: uniqueName(directory ? `${directory}/${name}` : name, usedNames), source: file.name, sourcePath: relativePath(file), file, originalBytes: file.size, originalStats: originalStats.get(file), runId: state.activeRunId, runStartedAt: state.activeRunStartedAt});
           rememberOutput(outputs[outputs.length - 1]);
         }
       } else {
@@ -1809,7 +1914,7 @@ async function runRecipe() {
         }
         const directory = relativePath(file).split("/").slice(0, -1).join("/");
         const name = `${stem(file.name)}-${stem(state.recipe.name)}.${outputExtension(result.mime)}`;
-        outputs.push({...result, name: uniqueName(directory ? `${directory}/${name}` : name, usedNames), source: file.name, sourcePath: relativePath(file), file, originalBytes: file.size, originalStats: originalStats.get(file)});
+        outputs.push({...result, name: uniqueName(directory ? `${directory}/${name}` : name, usedNames), source: file.name, sourcePath: relativePath(file), file, originalBytes: file.size, originalStats: originalStats.get(file), runId: state.activeRunId, runStartedAt: state.activeRunStartedAt});
         rememberOutput(outputs[outputs.length - 1]);
       }
       completed++;
@@ -1820,6 +1925,7 @@ async function runRecipe() {
         setProgress(completed, files.length);
       }
     }
+    await recoveryWrites;
     state.results = outputs;
     recordTask();
     renderResults();
@@ -1833,6 +1939,7 @@ async function runRecipe() {
       : `Recipe complete: ${outputs.length} output${outputs.length === 1 ? "" : "s"}.`;
   } finally {
     state.running = false;
+    setRunBusy(false);
     button.disabled = false;
   }
 }
@@ -1856,13 +1963,16 @@ function outputName(task, result) {
 function renderCompare(result) {
   const output = $("#compare-output");
   if (!output || !result || !state.files[0]) return;
+  state.compareUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   const sourceUrl = URL.createObjectURL(state.files[0]);
   const resultUrl = URL.createObjectURL(new Blob([result.bytes], {type: result.mime}));
+  state.compareUrls.push(sourceUrl, resultUrl);
   output.innerHTML = `<div class="compare-stage"><img src="${sourceUrl}" alt="Original"><img id="compare-result" src="${resultUrl}" alt="Compressed result"></div><label>Reveal result <input id="compare-slider" type="range" min="0" max="100" value="50"></label><p class="mono">Original ${Math.round(state.files[0].size / 1024)} KB · Result ${Math.round(result.bytes.byteLength / 1024)} KB</p>`;
   $("#compare-slider").oninput = (event) => { $("#compare-result").style.clipPath = `inset(0 ${100 - event.target.value}% 0 0)`; };
 }
 function renderResults() {
   const list = $("#result-list");
+  state.urls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   list.innerHTML = "";
   const good = state.results.filter((r) => r.bytes);
   for (const r of state.results) {
