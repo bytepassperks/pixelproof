@@ -2,29 +2,28 @@ PixelProof landing-page demonstration photograph
 -------------------------------------------------
 
 The landing background-removal comparison uses the same 1,600 × 1,064
-photograph as the bundled sample. It is the Pexels record for photo 2607544,
-“White dog wearing pink heart-shaped sunglasses,” downloaded from
-https://images.pexels.com/photos/2607544/pexels-photo-2607544.jpeg under the
+photograph as the bundled sample. It is the Pexels record “White and Brown
+Dogs on Green Grass” (photo 1108099), downloaded from
+https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg under the
 Pexels license. The source was center-cropped to the shipped 1,600 × 1,064
 frame. PixelProof then ran that photograph through its own click-to-select
 and continuous-alpha matting workflow, and quantized the transparent PNG for
 display without changing its dimensions. The result is stored at
-vendor/images/pixelproof-sample-photo-cutout.png and is 345,646 bytes. The
-shipped original is vendor/images/pixelproof-sample-photo.jpg at 222,927
+vendor/images/pixelproof-sample-photo-cutout.png and is 311,060 bytes. The
+shipped original is vendor/images/pixelproof-sample-photo.jpg at 242,455
 bytes; both artifacts are pixel-aligned and derived from the same photograph.
 The cutout uses PixelProof's optional edge-cleanup/decontamination pass,
 enabled by default for new background-removal runs.
 
-The landing hero uses responsive WebP derivatives of that same refined
-cutout: vendor/images/pixelproof-dog-hero-1024.webp is 1,024 × 681 and
-26,088 bytes for desktop/retina display, while
-vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 8,158 bytes for
-small screens. Both preserve alpha and are generated only from the shipped
-sample/cutout; no separate demo subject is used.
+The landing hero uses padded WebP derivatives of that same refined cutout:
+vendor/images/pixelproof-dog-hero-1024.webp is 1,024 × 681 and 26,964 bytes,
+while vendor/images/pixelproof-dog-hero-512.webp is 512 × 340 and 8,328 bytes.
+Both preserve alpha and include transparent margin around the complete
+photograph subject.
 
 The JPEG compression comparison is also derived from that same photograph:
-vendor/images/pixelproof-comparison-photo.jpg is 115,690 bytes, compared with
-222,927 bytes for the original, both at 1,600 × 1,064 pixels.
+vendor/images/pixelproof-comparison-photo.jpg is 122,535 bytes, compared with
+242,455 bytes for the original, both at 1,600 × 1,064 pixels.
 
 PixelProof Phase 2 model provenance
 
