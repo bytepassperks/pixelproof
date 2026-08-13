@@ -324,6 +324,8 @@ function blurBox(ctx, box, mode, strength) {
   }
 }
 self.onmessage = async ({data}) => {
+  const heartbeat = setInterval(() => self.postMessage({id: data.id, heartbeat: true}), 5_000);
+  self.postMessage({id: data.id, started: true});
   try {
     const {id, file, operation} = data, image = await decode(file.buffer, file.type);
     if (image.width * image.height > (operation.maxPixels || 64_000_000)) throw userFacingError(`Image is too large (${image.width}×${image.height}).`);
@@ -446,4 +448,5 @@ self.onmessage = async ({data}) => {
     self.postMessage({id, ok: true, ...result}, [result.bytes]);
     image.close();
   } catch (error) { self.postMessage({id: data.id, ok: false, error: error?.message || String(error), userFacing: error?.userFacing === true}); }
+  finally { clearInterval(heartbeat); }
 };

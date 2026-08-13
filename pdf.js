@@ -1,5 +1,6 @@
 const PDF_ASSET = "./vendor/pdf-lib/pdf-lib.min.js";
-const WORKER_TIMEOUT_MS = 30_000;
+const WORKER_START_TIMEOUT_MS = 20_000;
+const WORKER_STALL_TIMEOUT_MS = 300_000;
 import { decodeHeic, isHeic } from "./heic.js";
 
 export function pdfPageSize(size, orientation, width, height) {
@@ -50,17 +51,27 @@ export async function imageForPdf(file, svgSize = {width: 1200, height: 1200}, c
 export async function generatePdf(images, options) {
   const worker = new Worker("./pdf-worker.js");
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
+    let started = false;
+    let lastSignal = Date.now();
+    const watchdog = setInterval(() => {
+      const limit = started ? WORKER_STALL_TIMEOUT_MS : WORKER_START_TIMEOUT_MS;
+      if (Date.now() - lastSignal < limit) return;
+      clearInterval(watchdog);
       worker.terminate();
-      reject(new Error("PDF worker timed out."));
-    }, WORKER_TIMEOUT_MS);
+      reject(new Error("PDF worker stalled."));
+    }, 1_000);
     worker.onmessage = (event) => {
-      clearTimeout(timeout);
+      lastSignal = Date.now();
+      if (event.data.started || event.data.heartbeat) {
+        started ||= event.data.started === true;
+        return;
+      }
+      clearInterval(watchdog);
       worker.terminate();
       event.data.ok ? resolve(event.data.bytes) : reject(new Error(event.data.error));
     };
     worker.onerror = (event) => {
-      clearTimeout(timeout);
+      clearInterval(watchdog);
       worker.terminate();
       reject(event.error || new Error("PDF worker failed"));
     };

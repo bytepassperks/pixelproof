@@ -296,7 +296,7 @@ export function mountBackgroundTool(container, context) {
   );
   const status = element(
     "p",
-    { class: "mono background-status" },
+    { class: "mono background-status", role: "status", "aria-live": "polite", "aria-atomic": "true" },
     "Model downloads begin only when you run the tool.",
   );
   const row = element("div", { class: "run-row" });

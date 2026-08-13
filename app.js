@@ -19,7 +19,8 @@ import {
 } from "./privacy.js";
 
 let estimateRequest = 0;
-const WORKER_TIMEOUT_MS = 30_000;
+const WORKER_START_TIMEOUT_MS = 20_000;
+const WORKER_STALL_TIMEOUT_MS = 300_000;
 
 const toolDefs = [
   {
@@ -1635,7 +1636,7 @@ function stem(name) {
 function friendlyError(error) {
   const message = String(error?.message || error || "Unknown image-processing error.");
   if (error?.userFacing) return message;
-  if (/timed out/i.test(message))
+  if (/(?:worker|decoder) (?:stalled|timed out)/i.test(message))
     return "PixelProof stopped waiting for a browser worker. Try again, or use a smaller image.";
   if (/could not be decoded|decode|invalidstateerror/i.test(message))
     return "This file could not be decoded as a supported image. Check that it is a real JPEG, PNG, WebP, HEIC/HEIF, BMP, GIF, ICO, or SVG file.";
@@ -1706,12 +1707,22 @@ async function processOne(file, op) {
   }
   const worker = new Worker("./worker.js", {type: "module"});
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
+    let started = false;
+    let lastSignal = Date.now();
+    const watchdog = setInterval(() => {
+      const limit = started ? WORKER_STALL_TIMEOUT_MS : WORKER_START_TIMEOUT_MS;
+      if (Date.now() - lastSignal < limit) return;
+      clearInterval(watchdog);
       worker.terminate();
-      reject(new Error("Image worker timed out."));
-    }, WORKER_TIMEOUT_MS);
+      reject(new Error("Image worker stalled."));
+    }, 1_000);
     worker.onmessage = (e) => {
-      clearTimeout(timeout);
+      lastSignal = Date.now();
+      if (e.data.started || e.data.heartbeat) {
+        started ||= e.data.started === true;
+        return;
+      }
+      clearInterval(watchdog);
       worker.terminate();
       if (e.data.ok) resolve(e.data);
       else {
@@ -1721,7 +1732,7 @@ async function processOne(file, op) {
       }
     };
     worker.onerror = (e) => {
-      clearTimeout(timeout);
+      clearInterval(watchdog);
       worker.terminate();
       reject(e.error || new Error("Worker failed"));
     };
@@ -1739,7 +1750,7 @@ async function processOne(file, op) {
         );
       }),
     ).catch((error) => {
-      clearTimeout(timeout);
+      clearInterval(watchdog);
       worker.terminate();
       reject(error);
     });
@@ -2037,12 +2048,26 @@ async function generateIdSheet(image, photoW, photoH, paperW, paperH, copies, ma
   const worker = new Worker("./pdf-worker.js");
   const payload = {idSheet: true, image, photoW, photoH, paperW, paperH, copies, margin, gutter};
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
+    let started = false;
+    let lastSignal = Date.now();
+    const watchdog = setInterval(() => {
+      const limit = started ? WORKER_STALL_TIMEOUT_MS : WORKER_START_TIMEOUT_MS;
+      if (Date.now() - lastSignal < limit) return;
+      clearInterval(watchdog);
       worker.terminate();
-      reject(new Error("Print-sheet worker timed out."));
-    }, WORKER_TIMEOUT_MS);
-    worker.onmessage = (event) => { clearTimeout(timeout); worker.terminate(); event.data.ok ? resolve(event.data.bytes) : reject(new Error(event.data.error)); };
-    worker.onerror = (event) => { clearTimeout(timeout); worker.terminate(); reject(event.error || new Error("Print-sheet worker failed")); };
+      reject(new Error("Print-sheet worker stalled."));
+    }, 1_000);
+    worker.onmessage = (event) => {
+      lastSignal = Date.now();
+      if (event.data.started || event.data.heartbeat) {
+        started ||= event.data.started === true;
+        return;
+      }
+      clearInterval(watchdog);
+      worker.terminate();
+      event.data.ok ? resolve(event.data.bytes) : reject(new Error(event.data.error));
+    };
+    worker.onerror = (event) => { clearInterval(watchdog); worker.terminate(); reject(event.error || new Error("Print-sheet worker failed")); };
     worker.postMessage(payload, [image.bytes]);
   });
 }

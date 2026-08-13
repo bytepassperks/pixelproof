@@ -73,10 +73,12 @@ async function decode(buffer) {
 }
 
 self.onmessage = async ({data}) => {
+  const heartbeat = setInterval(() => self.postMessage({id: data.id, heartbeat: true}), 5_000);
+  self.postMessage({id: data.id, started: true});
   try {
     const result = await decode(data.buffer);
     self.postMessage({id: data.id, ...result}, [result.buffer]);
   } catch (error) {
     self.postMessage({id: data.id, error: error?.message || String(error)});
-  }
+  } finally { clearInterval(heartbeat); }
 };

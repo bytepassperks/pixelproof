@@ -57,10 +57,12 @@ async function buildIdSheet(data) {
 }
 
 self.onmessage = async ({data}) => {
+  const heartbeat = setInterval(() => self.postMessage({heartbeat: true}), 5_000);
+  self.postMessage({started: true});
   try {
     const bytes = data.idSheet ? await buildIdSheet(data) : await buildPdf(data.images, data.options);
     self.postMessage({ok: true, bytes}, [bytes.buffer]);
   } catch (error) {
     self.postMessage({ok: false, error: String(error?.message || error)});
-  }
+  } finally { clearInterval(heartbeat); }
 };
