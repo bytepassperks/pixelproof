@@ -338,6 +338,7 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .app-shell .file-summary-actions{display:flex;flex-wrap:wrap;gap:var(--space-3);margin-left:auto;min-width:0}
 .app-shell .file-summary .text-button{color:var(--darkroom);font-size:10px;text-decoration:underline}
 .app-shell .result-summary{border-left:3px solid var(--amber);color:var(--paper);font-size:12px;line-height:1.55;margin:0 0 var(--space-4);padding:var(--space-3) var(--space-4)}
+.app-shell .result-history-note{border-left:3px solid var(--amber);color:var(--paper-dim);font:11px var(--data-face);line-height:1.55;margin:0 0 var(--space-4);padding:var(--space-3) var(--space-4)}
 @media(max-width:600px){
   .proof-compare-card{
     grid-template-columns:1fr
