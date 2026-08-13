@@ -66,12 +66,21 @@ export function getLicenseKey() {
 }
 
 export function setLicenseState(value) {
+  const valid = isKnownLicenseState(value);
   try {
-    if (value?.valid && Object.prototype.hasOwnProperty.call(TIERS, value.tier) &&
-        TIERS[value.tier] && typeof TIERS[value.tier] === "object")
+    if (valid)
       localStorage.setItem(LICENSE_STATE, JSON.stringify(value));
     else localStorage.removeItem(LICENSE_STATE);
-  } catch {}
+  } catch { return false; }
+  return valid;
+}
+
+export function isKnownLicenseState(value) {
+  return Boolean(value?.valid === true &&
+    Object.prototype.hasOwnProperty.call(TIERS, value.tier) &&
+    TIERS[value.tier] && typeof TIERS[value.tier] === "object" &&
+    typeof value.label === "string" &&
+    Number.isInteger(value.maxFiles) && value.maxFiles > 0);
 }
 
 export async function revalidateLicense() {
@@ -102,6 +111,11 @@ export async function revalidateLicense() {
     try { data = await response.json(); } catch {}
     try { localStorage.setItem(LICENSE_CHECKED_AT, String(Date.now())); } catch {}
     if (!response.ok || !data.valid) {
+      setLicenseKey('');
+      setLicenseState(null);
+      return {status: 'invalid'};
+    }
+    if (!isKnownLicenseState(data)) {
       setLicenseKey('');
       setLicenseState(null);
       return {status: 'invalid'};

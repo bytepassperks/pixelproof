@@ -1,5 +1,5 @@
 import {PRODUCT} from './config.js';
-import {getEntitlementState, getLicenseKey, setLicenseKey, setLicenseState, LICENSE_API_URL} from './entitlements.js';
+import {getEntitlementState, getLicenseKey, isKnownLicenseState, setLicenseKey, setLicenseState, LICENSE_API_URL} from './entitlements.js';
 
 document.querySelectorAll('[data-brand]').forEach(element => {
   element.textContent = PRODUCT.brand;
@@ -40,6 +40,7 @@ form.onsubmit = async event => {
       throw new Error("Licence service returned an invalid response.");
     }
     if (!response.ok || !data.valid) throw new Error(data.error || 'That licence key could not be validated.');
+    if (!isKnownLicenseState(data)) throw new Error('Licence service returned an invalid response.');
     setLicenseKey(key);
     setLicenseState(data);
     try { localStorage.setItem('pixelproof-license-checked-at', String(Date.now())); } catch {}

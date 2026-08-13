@@ -80,6 +80,13 @@ function tierFromProduct(productId: unknown, env: Env): Tier | null {
   return null;
 }
 
+function tierFromLicenseResponse(data: Record<string, unknown>, env: Env): Tier | null {
+  const tier = tierFromProduct(data.product_id || data.productId, env);
+  if (!tier) return null;
+  if (data.tier !== undefined && data.tier !== tier) return null;
+  return tier;
+}
+
 async function checkout(request: Request, env: Env) {
   const payload = await body(request);
   const tier = payload.tier === 'studio' ? 'studio' : payload.tier === 'solo' ? 'solo' : null;
@@ -88,10 +95,15 @@ async function checkout(request: Request, env: Env) {
     return json(request, env, {error: 'checkout is not configured', valid: false}, 503);
   }
   const productId = tier === 'studio' ? env.DODO_STUDIO_PRODUCT_ID : env.DODO_SOLO_PRODUCT_ID;
-  const result = await dodo(env, '/checkouts', {
-    product_cart: [{product_id: productId, quantity: 1}],
-    return_url: `${env.PAGES_ORIGIN}/activate.html`,
-  });
+  let result;
+  try {
+    result = await dodo(env, '/checkouts', {
+      product_cart: [{product_id: productId, quantity: 1}],
+      return_url: `${env.PAGES_ORIGIN}/activate.html`,
+    });
+  } catch {
+    return json(request, env, {error: 'checkout is temporarily unavailable'}, 503);
+  }
   const url = typeof result.data.checkout_url === 'string' ? result.data.checkout_url : '';
   if (!result.response.ok || !url) return json(request, env, {error: 'checkout is temporarily unavailable'}, 502);
   return json(request, env, {checkout_url: url, tier});
@@ -104,11 +116,16 @@ async function validate(request: Request, env: Env) {
   if (!env.DODO_BASE_URL || !env.DODO_API_KEY || !env.DODO_BUSINESS_ID) {
     return json(request, env, {error: 'licence validation is temporarily unavailable', valid: false}, 503);
   }
-  const result = await dodo(env, '/licenses/validate', {license_key: key});
-  const valid = result.response.ok && result.data.valid !== false;
-  if (!valid) return json(request, env, {valid: false, error: 'licence key is invalid or inactive'}, 403);
-  const tier = tierFromProduct(result.data.product_id || result.data.productId, env)
-    || (result.data.tier === 'studio' ? 'studio' : 'solo');
+  let result;
+  try {
+    result = await dodo(env, '/licenses/validate', {license_key: key});
+  } catch {
+    return json(request, env, {error: 'licence validation is temporarily unavailable', valid: false}, 503);
+  }
+  if (!result.response.ok || result.data.valid !== true)
+    return json(request, env, {valid: false, error: 'licence key is invalid or inactive'}, 403);
+  const tier = tierFromLicenseResponse(result.data, env);
+  if (!tier) return json(request, env, {valid: false, error: 'licence service returned an invalid product'}, 502);
   const config = TIER_CONFIG[tier];
   await env.DB.prepare(
     `INSERT INTO licenses(license_key,tier,email,dodo_payment_id,status,created_at,updated_at)
@@ -134,23 +151,33 @@ async function verifyWebhook(request: Request, env: Env, raw: string) {
 async function webhook(request: Request, env: Env) {
   const raw = await request.text();
   if (!(await verifyWebhook(request, env, raw))) return json(request, env, {error: 'invalid webhook signature'}, 401);
+  let event: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(raw);
+    event = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
+  } catch {
+    return json(request, env, {error: 'invalid webhook payload'}, 400);
+  }
+  const data = event.data && typeof event.data === 'object' ? event.data as Record<string, unknown> : {};
+  const eventType = String(event.type || '');
+  const key = typeof data.license_key === 'string' ? data.license_key : typeof data.licenseKey === 'string' ? data.licenseKey : '';
+  const productId = data.product_id || data.productId;
+  const tier = tierFromProduct(productId, env);
+  const isRevocation = eventType.includes('refund') || eventType.includes('cancel');
+  if (!key) return json(request, env, {error: 'webhook license_key is required'}, 400);
+  if (!isRevocation && !tier) return json(request, env, {error: 'webhook product is unknown'}, 400);
   const eventId = request.headers.get('webhook-id') || crypto.randomUUID();
   const inserted = await env.DB.prepare('INSERT OR IGNORE INTO webhook_events(event_id,received_at) VALUES(?1,?2)').bind(eventId, now()).run();
   if (!inserted.meta.changes) return json(request, env, {ok: true, duplicate: true});
-  const event = JSON.parse(raw) as Record<string, unknown>;
-  const data = event.data && typeof event.data === 'object' ? event.data as Record<string, unknown> : {};
-  const key = typeof data.license_key === 'string' ? data.license_key : typeof data.licenseKey === 'string' ? data.licenseKey : '';
   const paymentId = typeof data.payment_id === 'string' ? data.payment_id : typeof data.paymentId === 'string' ? data.paymentId : null;
-  const productId = data.product_id || data.productId;
-  const tier = tierFromProduct(productId, env);
-  if (key && tier && String(event.type || '').includes('succeeded')) {
+  if (tier && eventType.includes('succeeded')) {
     await env.DB.prepare(
       `INSERT INTO licenses(license_key,tier,email,dodo_payment_id,status,created_at,updated_at)
        VALUES(?1,?2,?3,?4,'active',?5,?5)
        ON CONFLICT(license_key) DO UPDATE SET tier=excluded.tier,email=excluded.email,dodo_payment_id=excluded.dodo_payment_id,status='active',updated_at=excluded.updated_at`,
     ).bind(key, tier, data.email || null, paymentId, now()).run();
   }
-  if (key && (String(event.type || '').includes('refund') || String(event.type || '').includes('cancel'))) {
+  if (isRevocation) {
     await env.DB.prepare('UPDATE licenses SET status=\'disabled\',updated_at=?2 WHERE license_key=?1').bind(key, now()).run();
   }
   return json(request, env, {ok: true});
