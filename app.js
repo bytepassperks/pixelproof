@@ -400,6 +400,10 @@ async function restoreRecovery() {
     if (!saved?.length || state.results.length) return;
     const recent = saved.filter((item) =>
       item.runId &&
+      item.name &&
+      item.mime &&
+      ((item.bytes instanceof ArrayBuffer && item.bytes.byteLength > 0) ||
+        (ArrayBuffer.isView(item.bytes) && item.bytes.byteLength > 0)) &&
       Date.now() - item.savedAt < 24 * 60 * 60 * 1000,
     );
     if (!recent.length) return;
