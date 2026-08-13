@@ -1,5 +1,5 @@
 import {PRODUCT} from './config.js';
-import {getLicenseKey, getEntitlementState, setLicenseKey, setLicenseState, LICENSE_API_URL} from './entitlements.js';
+import {getEntitlementState, revalidateLicense, LICENSE_API_URL} from './entitlements.js';
 
 if ('serviceWorker' in navigator) {
   if (navigator.serviceWorker.controller)
@@ -25,40 +25,34 @@ document.querySelectorAll('[data-checkout]').forEach(button => {
     }
     button.disabled = true;
     status.textContent = 'Opening secure checkout…';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
     try {
       const response = await fetch(`${LICENSE_API_URL}/checkout`, {
         method: 'POST',
         headers: {'content-type': 'application/json'},
         body: JSON.stringify({tier}),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       const data = await response.json();
       if (!response.ok || !data.checkout_url) throw new Error(data.error || 'Checkout is temporarily unavailable.');
       window.location.href = data.checkout_url;
     } catch (error) {
-      status.textContent = error.message;
+      clearTimeout(timer);
+      status.textContent = error.name === 'AbortError' ? 'Checkout timed out. Please try again.' : error.message;
       button.disabled = false;
     }
   };
 });
 
-const key = getLicenseKey();
-if (key) {
-  fetch(`${LICENSE_API_URL}/license/validate`, {
-    method: 'POST',
-    headers: {'content-type': 'application/json'},
-    body: JSON.stringify({license_key: key}),
-  }).then(response => response.json().then(data => ({response, data})))
-    .then(({response, data}) => {
-      if (response.ok && data.valid) setLicenseState(data);
-      else setLicenseKey('');
-    })
-    .catch(() => setLicenseState(null));
-}
-
 const state = getEntitlementState();
 if (state.tier !== 'free') {
   status.textContent = `${state.label} is active on this browser.`;
 }
+revalidateLicense().then(result => {
+  if (result.status === 'invalid') status.textContent = 'Your stored licence is no longer active. The Free tier remains available.';
+});
 
 const compareStage = document.querySelector('#proof-compare-stage');
 const compareSlider = document.querySelector('#proof-compare-slider');

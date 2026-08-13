@@ -154,6 +154,7 @@ export async function clearLocalData(category) {
   if (category === "licence" || category === "all") {
     localStorage.removeItem("pixelproof-license-key");
     localStorage.removeItem("pixelproof-license-state");
+    localStorage.removeItem("pixelproof-license-checked-at");
   }
 }
 

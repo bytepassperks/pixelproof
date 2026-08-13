@@ -3,6 +3,8 @@ import {PRODUCT, TIERS} from './config.js';
 const LICENSE_KEY = 'pixelproof-license-key';
 const LICENSE_STATE = 'pixelproof-license-state';
 const TASK_STATE = 'pixelproof-task-state';
+const LICENSE_CHECKED_AT = 'pixelproof-license-checked-at';
+const REVALIDATION_INTERVAL = 24 * 60 * 60 * 1000;
 
 function today() {
   const date = new Date();
@@ -53,7 +55,11 @@ export function setLicenseKey(key) {
 }
 
 export function getLicenseKey() {
-  return localStorage.getItem(LICENSE_KEY) || '';
+  try {
+    return localStorage.getItem(LICENSE_KEY) || '';
+  } catch {
+    return '';
+  }
 }
 
 export function setLicenseState(value) {
@@ -61,6 +67,45 @@ export function setLicenseState(value) {
     if (value?.valid && TIERS[value.tier]) localStorage.setItem(LICENSE_STATE, JSON.stringify(value));
     else localStorage.removeItem(LICENSE_STATE);
   } catch {}
+}
+
+export async function revalidateLicense() {
+  const key = getLicenseKey();
+  const state = readLicense();
+  if (!state) return {status: 'none'};
+  if (!key) {
+    setLicenseState(null);
+    return {status: 'invalid'};
+  }
+  if (navigator.onLine === false) return {status: 'offline'};
+  let checkedAt = 0;
+  try {
+    checkedAt = Number(localStorage.getItem(LICENSE_CHECKED_AT) || 0);
+  } catch {}
+  if (Date.now() - checkedAt < REVALIDATION_INTERVAL) return {status: 'cached'};
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    const response = await fetch(`${LICENSE_API_URL}/license/validate`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({license_key: key}),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    let data = {};
+    try { data = await response.json(); } catch {}
+    try { localStorage.setItem(LICENSE_CHECKED_AT, String(Date.now())); } catch {}
+    if (!response.ok || !data.valid) {
+      setLicenseKey('');
+      setLicenseState(null);
+      return {status: 'invalid'};
+    }
+    setLicenseState(data);
+    return {status: 'valid'};
+  } catch {
+    return {status: 'offline'};
+  }
 }
 
 export function recordTask() {

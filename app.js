@@ -6,6 +6,7 @@ import {
   getEntitlementState,
   limitMessage,
   recordTask,
+  revalidateLicense,
 } from "./entitlements.js";
 import { mountBackgroundTool } from "./background-removal.js";
 import { inspectMetadata } from "./metadata.js";
@@ -2234,6 +2235,10 @@ async function saveResultsToFolder(results) {
 selectTool("compress");
 initRecipes();
 restoreRecovery();
+revalidateLicense().then((result) => {
+  if (result.status === "invalid")
+    announce("Your stored licence is no longer active. The Free tier remains available; activate again if you have a current key.");
+});
 detectFormats();
 async function detectFormats() {
   const canvas = document.createElement("canvas");

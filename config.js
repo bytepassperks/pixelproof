@@ -24,7 +24,6 @@ export const TIERS = Object.freeze({
     tasksPerDay: 10,
     maxFiles: 5,
     backgroundRemoval: false,
-    clientUse: false,
   }),
   solo: Object.freeze({
     label: 'Lifetime Solo',
@@ -32,7 +31,6 @@ export const TIERS = Object.freeze({
     tasksPerDay: Infinity,
     maxFiles: 100,
     backgroundRemoval: true,
-    clientUse: false,
   }),
   studio: Object.freeze({
     label: 'Lifetime Studio',
@@ -40,7 +38,6 @@ export const TIERS = Object.freeze({
     tasksPerDay: Infinity,
     maxFiles: 250,
     backgroundRemoval: true,
-    clientUse: true,
   }),
   limits: {maxFiles: 5, maxPixels: PRODUCT.maxPixels},
 });
