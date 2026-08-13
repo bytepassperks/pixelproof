@@ -141,6 +141,7 @@ const toolDefs = [
   },
   {
     id: "compare",
+    operationTypes: ["compress"],
     label: "Compression compare",
     kicker: "ANALYSIS / COMPARE",
     title: "Pick quality by eye.",
@@ -155,6 +156,7 @@ const toolDefs = [
   },
   {
     id: "image-to-pdf",
+    operationTypes: ["pdf"],
     label: "Image to PDF",
     kicker: "WORKFLOW / PDF",
     title: "Build the document.",
@@ -162,6 +164,7 @@ const toolDefs = [
   },
   {
     id: "platform-profiles",
+    operationTypes: ["resize"],
     label: "Platform profiles",
     kicker: "WORKFLOW / PUBLISHED GUIDANCE",
     title: "Start from the destination.",
@@ -169,6 +172,7 @@ const toolDefs = [
   },
   {
     id: "id-print-sheet",
+    operationTypes: ["id-sheet"],
     label: "ID print sheet",
     kicker: "WORKFLOW / DIMENSIONS ONLY",
     title: "Lay out the photos.",
@@ -176,6 +180,7 @@ const toolDefs = [
   },
   {
     id: "svg-raster",
+    operationTypes: ["resize", "svg-raster"],
     label: "SVG rasterise",
     kicker: "FORMAT / SVG",
     title: "Rasterise SVG safely.",
@@ -183,6 +188,12 @@ const toolDefs = [
   },
 ];
 toolDefs.forEach(registerTool);
+function operationTypesForTool(toolId) {
+  return toolDefs.find((tool) => tool.id === toolId)?.operationTypes || [toolId];
+}
+function operationTypeForTool(toolId) {
+  return operationTypesForTool(toolId)[0];
+}
 const $ = (s) => document.querySelector(s);
 const state = {
   tool: "compress",
@@ -418,20 +429,14 @@ function allRecipes() {
     ),
   );
 }
-const recipeOperationTypes = new Map([
-  ["platform-profiles", "resize"],
-  ["image-to-pdf", "pdf"],
-  ["id-print-sheet", "id-sheet"],
-  ["svg-raster", "svg-raster"],
-]);
 function validateRecipeStep(step) {
   if (!step || typeof step.tool !== "string" || typeof step.label !== "string" ||
       step.label.length > 160 || !step.operation || typeof step.operation !== "object" ||
       Array.isArray(step.operation)) return "Recipe contains an unknown or invalid operation.";
-  const expectedType = recipeOperationTypes.get(step.tool) || step.tool;
-  if (!toolDefs.some((tool) => tool.id === step.tool))
+  const tool = toolDefs.find((item) => item.id === step.tool);
+  if (!tool)
     return `Recipe references unknown tool “${step.tool}”.`;
-  if (step.operation.type !== expectedType)
+  if (!operationTypesForTool(step.tool).includes(step.operation.type))
     return `Recipe step “${step.label}” does not match its selected tool.`;
   return "";
 }
@@ -1596,25 +1601,25 @@ async function options() {
     q = Number($("#quality")?.value || 88),
     format = $("#format")?.value || "image/png";
   if (id === "compress" || id === "convert")
-    return { type: id, mime: format, quality: q / 100, pngOptimize: false, pngPalette: format === "image/png" && $("#pngMode")?.value === "palette" };
+    return { type: operationTypeForTool(id), mime: format, quality: q / 100, pngOptimize: false, pngPalette: format === "image/png" && $("#pngMode")?.value === "palette" };
   if (id === "target-size") {
-    return {type: id, mime: $("#format").value, targetBytes: Number($("#targetBytes").value), reduceDimensions: $("#reduceDimensions").checked, metadata: {mode: "strip"}};
+    return {type: operationTypeForTool(id), mime: $("#format").value, targetBytes: Number($("#targetBytes").value), reduceDimensions: $("#reduceDimensions").checked, metadata: {mode: "strip"}};
   }
   if (id === "metadata") {
     const metadata = await inspectMetadata(state.files[0]);
-    return {type: "metadata", mime: "image/jpeg", quality: 0.92, metadata: {mode: $("#metadataMode").value, ...metadata.fields}};
+    return {type: operationTypeForTool(id), mime: "image/jpeg", quality: 0.92, metadata: {mode: $("#metadataMode").value, ...metadata.fields}};
   }
-  if (id === "platform-profiles") return {type: "resize", mode: $("#platformMode").value === "fill" ? "fill" : "contain", width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mime: $("#platformMime").value};
-  if (id === "image-to-pdf") return {type: "pdf", pageSize: $("#pdfSize").value, orientation: $("#pdfOrientation").value, mode: $("#pdfMode").value, margin: Number($("#pdfMargin").value || 0)};
-  if (id === "id-print-sheet") return {type: "id-sheet", profile: $("#idProfile").value, paper: $("#idPaper").value, copies: Number($("#idCopies").value || 1)};
-  if (id === "svg-raster") return {type: "resize", mode: "exact", width: Number($("#svgWidth").value), height: Number($("#svgHeight").value), mime: "image/png"};
+  if (id === "platform-profiles") return {type: operationTypeForTool(id), mode: $("#platformMode").value === "fill" ? "fill" : "contain", width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mime: $("#platformMime").value};
+  if (id === "image-to-pdf") return {type: operationTypeForTool(id), pageSize: $("#pdfSize").value, orientation: $("#pdfOrientation").value, mode: $("#pdfMode").value, margin: Number($("#pdfMargin").value || 0)};
+  if (id === "id-print-sheet") return {type: operationTypeForTool(id), profile: $("#idProfile").value, paper: $("#idPaper").value, copies: Number($("#idCopies").value || 1)};
+  if (id === "svg-raster") return {type: operationTypeForTool(id), mode: "exact", width: Number($("#svgWidth").value), height: Number($("#svgHeight").value), mime: "image/png"};
   if (id === "resize") {
     const mode = $("#mode").value;
     let w = Number($("#width").value),
       h = Number($("#height").value);
     if (mode === "fit") [w, h] = $("#preset").value.split("x").map(Number);
     return {
-      type: id,
+      type: operationTypeForTool(id),
       mode,
       width: w,
       height: h,
@@ -1631,7 +1636,7 @@ async function options() {
       h = Math.round((w * b) / a);
     }
     return {
-      type: id,
+      type: operationTypeForTool(id),
       x: Number($("#x").value),
       y: Number($("#y").value),
       width: w,
@@ -1642,7 +1647,7 @@ async function options() {
   if (id === "transform") {
     const flip = $("#flip").value;
     return {
-      type: id,
+      type: operationTypeForTool(id),
       degrees: Number($("#degrees").value),
       flipX: flip === "x",
       flipY: flip === "y",
@@ -1652,7 +1657,7 @@ async function options() {
   if (id === "watermark") {
     const mark = $("#mark")?.files[0];
     return {
-      type: id,
+      type: operationTypeForTool(id),
       text: $("#text").value,
       position: $("#position").value,
       opacity: Number($("#opacity").value),
@@ -1665,7 +1670,7 @@ async function options() {
   if (id === "photo-editor") return editorOperation();
   if (id === "meme") {
     return {
-      type: id,
+      type: operationTypeForTool(id),
       top: $("#top").value,
       bottom: $("#bottom").value,
       size: Number($("#size").value),
@@ -1685,12 +1690,12 @@ async function options() {
       linkedin: [1200, 627],
     };
     const [width, height] = sizes[$("#preset").value];
-    return {type: id, width, height, fill: $("#framing").value === "fill", mime: "image/png"};
+    return {type: operationTypeForTool(id), width, height, fill: $("#framing").value === "fill", mime: "image/png"};
   }
-  if (id === "icon-set") return {type: id, width: 512, height: 512, fill: false, mime: "image/png"};
-  if (id === "rename") return {type: "rename", mime: "image/png"};
-  if (id === "compare") return {type: "compress", mime: $("#format").value, quality: Number($("#quality").value) / 100};
-  return { type: id, mime: format, quality: q / 100 };
+  if (id === "icon-set") return {type: operationTypeForTool(id), width: 512, height: 512, fill: false, mime: "image/png"};
+  if (id === "rename") return {type: operationTypeForTool(id), mime: "image/png"};
+  if (id === "compare") return {type: operationTypeForTool(id), mime: $("#format").value, quality: Number($("#quality").value) / 100};
+  return { type: operationTypeForTool(id), mime: format, quality: q / 100 };
 }
 function stem(name) {
   return (
