@@ -990,7 +990,7 @@ function renderControls() {
       outputEstimatePending();
       updateEstimate();
     };
-    $("#pngMode").onchange = () => {
+    if ($("#pngMode")) $("#pngMode").onchange = () => {
       updateQualityAvailability();
       outputEstimatePending();
       updateEstimate();
