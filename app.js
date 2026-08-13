@@ -17,6 +17,8 @@ import {
   privacySelfTestText,
 } from "./privacy.js";
 
+let estimateRequest = 0;
+
 const toolDefs = [
   {
     id: "compress",
@@ -752,10 +754,19 @@ function setRunBusy(busy) {
   });
   const button = $("#run-button");
   if (!button) return;
+  const progress = $("#run-progress");
+  if (progress) progress.hidden = !busy;
   button.textContent = busy ? "Cancel current job" : "Process images";
   button.setAttribute("aria-label", busy
     ? `Cancel current ${current?.label || "image"} job`
     : `Run ${current?.label || "image"} job`);
+}
+function outputEstimatePending() {
+  const output = $("#size-estimate");
+  if (!output || !state.files[0]) return;
+  const countLabel = state.files.length > 1 ? `First image of ${state.files.length}` : "Selected image";
+  output.textContent = `${countLabel}: estimating…`;
+  estimateRequest++;
 }
 async function inspectAnimations(files) {
   const found = [];
@@ -962,13 +973,29 @@ function renderControls() {
   if (id === "id-print-sheet") setupIdSheetControls();
   if ($("#quality")) {
     let estimateTimer;
+    const updateQualityAvailability = () => {
+      const lossless = $("#format")?.value === "image/png" && $("#pngMode")?.value === "lossless";
+      $("#quality").disabled = lossless;
+      $("#quality").closest(".field")?.classList.toggle("is-disabled", lossless);
+    };
     $("#quality").oninput = (e) => {
       const o = $("#quality-output");
       if (o) o.value = e.target.value;
       clearTimeout(estimateTimer);
+      outputEstimatePending();
       estimateTimer = setTimeout(updateEstimate, 250);
     };
-    $("#format").onchange = updateEstimate;
+    $("#format").onchange = () => {
+      updateQualityAvailability();
+      outputEstimatePending();
+      updateEstimate();
+    };
+    $("#pngMode").onchange = () => {
+      updateQualityAvailability();
+      outputEstimatePending();
+      updateEstimate();
+    };
+    updateQualityAvailability();
     updateEstimate();
     if (id === "compress" && state.files[0]) {
       inputFormatPreference(state.files[0]).then((preference) => {
@@ -1042,15 +1069,19 @@ function setupIdSheetControls() {
 async function updateEstimate() {
   const output = $("#size-estimate");
   if (!output || !state.files[0] || state.running) return;
-  output.textContent = "Estimating…";
+  const request = ++estimateRequest;
+  const countLabel = state.files.length > 1 ? `First image of ${state.files.length}` : "Selected image";
+  output.textContent = `${countLabel}: estimating…`;
   try {
     const result = await processOne(state.files[0], {
       ...options(),
       maxPixels: PRODUCT.maxPixels,
     });
-    output.textContent = `${Math.round(result.bytes.byteLength / 1024)} KB · ${result.mime}`;
+    if (request !== estimateRequest) return;
+    const lossless = result.mime === "image/png" && $("#pngMode")?.value === "lossless";
+    output.textContent = `${countLabel}: ${formatBytes(result.bytes.byteLength)} · ${result.mime}${lossless ? " · lossless" : ""}`;
   } catch (error) {
-    output.textContent = "Unavailable";
+    if (request === estimateRequest) output.textContent = `${countLabel}: unavailable`;
   }
 }
 function setupCropPreview() {
