@@ -17,6 +17,9 @@ orientation in JPEG output. Folder inputs retain safe relative paths in ZIP
 exports, and named saved settings can be exported/imported as JSON pipeline
 files. The app shell is installable and cacheable for offline workbench use;
 first-use model downloads still need a network connection.
+
+Deployment and cross-browser verification steps are documented in
+[`docs/operations-runbook.md`](docs/operations-runbook.md).
 HEIC/HEIF photos are accepted as input across the workbench. They are decoded
 locally in a separately loaded worker using the unmodified LGPL libheif/libde265
 WASM module, then enter the ordinary browser-local image pipeline; HEIC is not
