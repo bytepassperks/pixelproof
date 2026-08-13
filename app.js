@@ -831,7 +831,6 @@ function addFiles(list, isSample = false, append = false) {
     state.animationFiles = [...new Set([...state.animationFiles, ...found])];
     renderAnimationWarning();
   });
-  inspectColorInfo(incoming[0]).then(() => renderColorWarning(incoming));
   const oversized = state.files.find((f) => f.size > PRODUCT.maxPixels * 4);
   $("#file-summary").hidden = false;
   const entitlement = getEntitlementState();
@@ -848,6 +847,7 @@ function addFiles(list, isSample = false, append = false) {
   $(".clear-sample")?.addEventListener("click", clearFiles);
   $("#controls").hidden = false;
   renderControls();
+  renderColorWarning(state.files);
 }
 function refreshJobLimit() {
   const summary = $("#file-summary");
@@ -1003,8 +1003,8 @@ async function renderColorWarning(files = state.files) {
   }
   const details = [];
   if (profile.length) details.push(`embedded colour profiles may be converted to the browser's working colour space and are not carried into exports: ${profile.join(", ")}`);
-  if (highDepth.length) details.push(`higher-than-8-bit input is reduced to 8-bit canvas output: ${highDepth.join(", ")}`);
-  output.innerHTML = `<div class="warning-callout"><strong>Colour handling:</strong> ${details.join(" ")}</div>`;
+  if (highDepth.length) details.push(`Higher-than-8-bit input is reduced to 8-bit canvas output: ${highDepth.join(", ")}`);
+  output.innerHTML = `<div class="warning-callout"><strong>Colour handling:</strong> ${details.join(". ")}.</div>`;
 }
 function savedSettings() {
   return readStoredObject(SETTINGS_KEY);
