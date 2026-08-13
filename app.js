@@ -1073,8 +1073,9 @@ async function updateEstimate() {
   const countLabel = state.files.length > 1 ? `First image of ${state.files.length}` : "Selected image";
   output.textContent = `${countLabel}: estimating…`;
   try {
+    const base = await options();
     const result = await processOne(state.files[0], {
-      ...options(),
+      ...base,
       maxPixels: PRODUCT.maxPixels,
     });
     if (request !== estimateRequest) return;
