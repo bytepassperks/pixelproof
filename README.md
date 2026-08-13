@@ -59,6 +59,11 @@ npx wrangler d1 migrations apply pixelproof-licenses --remote --config worker/wr
 npx wrangler deploy --config worker/wrangler.toml
 ```
 
+Worker and D1 deployment use the `CLOUDFLARE_WAMOJO_API_TOKEN` for the
+configured Wamojo account. Pages deployment uses the same token through
+`scripts/deploy-pages.sh`. Do not substitute the token for the
+`getlaunchpod.workers.dev` account.
+
 Set secrets with `wrangler secret put NAME --config worker/wrangler.toml`.
 The client API URL is centralized in `config.js`.
 
