@@ -87,6 +87,24 @@ function tierFromLicenseResponse(data: Record<string, unknown>, env: Env): Tier 
   return tier;
 }
 
+function webhookLicense(data: Record<string, unknown>) {
+  const nested = data.license_key && typeof data.license_key === 'object'
+    ? data.license_key as Record<string, unknown>
+    : {};
+  const key = typeof data.license_key === 'string' ? data.license_key
+    : typeof data.licenseKey === 'string' ? data.licenseKey
+      : typeof data.key === 'string' ? data.key
+        : typeof nested.key === 'string' ? nested.key
+          : '';
+  const productId = data.product_id || data.productId || nested.product_id || nested.productId;
+  const paymentId = typeof data.payment_id === 'string' ? data.payment_id
+    : typeof data.paymentId === 'string' ? data.paymentId
+      : typeof nested.payment_id === 'string' ? nested.payment_id
+        : typeof nested.paymentId === 'string' ? nested.paymentId
+          : null;
+  return {key, productId, paymentId};
+}
+
 async function checkout(request: Request, env: Env) {
   const payload = await body(request);
   const tier = payload.tier === 'studio' ? 'studio' : payload.tier === 'solo' ? 'solo' : null;
@@ -141,6 +159,8 @@ async function verifyWebhook(request: Request, env: Env, raw: string) {
   const timestamp = request.headers.get('webhook-timestamp');
   const signature = request.headers.get('webhook-signature');
   if (!secret || !id || !timestamp || !signature) return false;
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 5 * 60) return false;
   const key = secret.replace(/^whsec_/, '');
   const cryptoKey = await crypto.subtle.importKey('raw', Uint8Array.from(atob(key), char => char.charCodeAt(0)), {name: 'HMAC', hash: 'SHA-256'}, false, ['sign']);
   const signed = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(`${id}.${timestamp}.${raw}`));
@@ -160,17 +180,21 @@ async function webhook(request: Request, env: Env) {
   }
   const data = event.data && typeof event.data === 'object' ? event.data as Record<string, unknown> : {};
   const eventType = String(event.type || '');
-  const key = typeof data.license_key === 'string' ? data.license_key : typeof data.licenseKey === 'string' ? data.licenseKey : '';
-  const productId = data.product_id || data.productId;
+  const webhookData = webhookLicense(data);
+  const key = webhookData.key;
+  const productId = webhookData.productId;
   const tier = tierFromProduct(productId, env);
-  const isRevocation = eventType.includes('refund') || eventType.includes('cancel');
+  const isRevocation = eventType.includes('refund') || eventType.includes('cancel') ||
+    eventType.includes('expired') || eventType.includes('disabled') || eventType.includes('revoked');
+  const isActivation = eventType.includes('succeeded') || eventType.includes('created') ||
+    eventType.includes('delivered');
   if (!key) return json(request, env, {error: 'webhook license_key is required'}, 400);
-  if (!isRevocation && !tier) return json(request, env, {error: 'webhook product is unknown'}, 400);
+  if (!isRevocation && (!isActivation || !tier)) return json(request, env, {error: 'webhook product is unknown'}, 400);
   const eventId = request.headers.get('webhook-id') || crypto.randomUUID();
   const inserted = await env.DB.prepare('INSERT OR IGNORE INTO webhook_events(event_id,received_at) VALUES(?1,?2)').bind(eventId, now()).run();
   if (!inserted.meta.changes) return json(request, env, {ok: true, duplicate: true});
-  const paymentId = typeof data.payment_id === 'string' ? data.payment_id : typeof data.paymentId === 'string' ? data.paymentId : null;
-  if (tier && eventType.includes('succeeded')) {
+  const paymentId = webhookData.paymentId;
+  if (tier && isActivation) {
     await env.DB.prepare(
       `INSERT INTO licenses(license_key,tier,email,dodo_payment_id,status,created_at,updated_at)
        VALUES(?1,?2,?3,?4,'active',?5,?5)
