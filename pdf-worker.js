@@ -35,13 +35,23 @@ async function buildIdSheet(data) {
   const embedded = await pdf.embedJpg(data.image.bytes);
   const photoW = data.photoW * 72 / 25.4, photoH = data.photoH * 72 / 25.4;
   const paperW = data.paperW * 72 / 25.4, paperH = data.paperH * 72 / 25.4;
-  const columns = Math.max(1, Math.floor(paperW / photoW));
-  const rows = Math.max(1, Math.floor(paperH / photoH));
+  const margin = data.margin * 72 / 25.4;
+  const gutter = data.gutter * 72 / 25.4;
+  const guideOffset = 0.4 * 72 / 25.4;
+  const columns = Math.max(1, Math.floor((paperW - margin * 2 + gutter) / (photoW + gutter)));
+  const rows = Math.max(1, Math.floor((paperH - margin * 2 + gutter) / (photoH + gutter)));
   const total = Math.min(data.copies, columns * rows);
   page.drawRectangle({x: 0, y: 0, width: paperW, height: paperH, color: rgb(1, 1, 1)});
   for (let index = 0; index < total; index++) {
     const column = index % columns, row = Math.floor(index / columns);
-    page.drawImage(embedded, {x: column * photoW, y: paperH - (row + 1) * photoH, width: photoW, height: photoH});
+    const x = margin + column * (photoW + gutter);
+    const y = paperH - margin - photoH - row * (photoH + gutter);
+    page.drawImage(embedded, {x, y, width: photoW, height: photoH});
+    const guideColor = rgb(0.68, 0.68, 0.68);
+    page.drawLine({start: {x: x - guideOffset, y: y - guideOffset}, end: {x: x - guideOffset, y: y + photoH + guideOffset}, thickness: 0.25, color: guideColor});
+    page.drawLine({start: {x: x + photoW + guideOffset, y: y - guideOffset}, end: {x: x + photoW + guideOffset, y: y + photoH + guideOffset}, thickness: 0.25, color: guideColor});
+    page.drawLine({start: {x: x - guideOffset, y: y - guideOffset}, end: {x: x + photoW + guideOffset, y: y - guideOffset}, thickness: 0.25, color: guideColor});
+    page.drawLine({start: {x: x - guideOffset, y: y + photoH + guideOffset}, end: {x: x + photoW + guideOffset, y: y + photoH + guideOffset}, thickness: 0.25, color: guideColor});
   }
   return pdf.save({useObjectStreams: true});
 }

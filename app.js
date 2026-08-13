@@ -1952,12 +1952,13 @@ async function runIdPrintSheet(runFiles) {
     setProgress(0, 1);
     const requestedCopies = Number($("#idCopies").value || 1);
     const image = await imageForPdf(file, undefined, photoW / photoH);
-    const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, requestedCopies);
+    const margin = 5, gutter = 2;
+    const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, requestedCopies, margin, gutter);
     state.results = [{name: `${stem(file.name)}-${$("#idProfile").value}-print-sheet.pdf`, bytes, mime: "application/pdf", source: file.name, originalBytes: file.size}];
     renderResults();
     setProgress(1, 1);
-    const columns = Math.max(1, Math.floor(paperW / photoW));
-    const rows = Math.max(1, Math.floor(paperH / photoH));
+    const columns = Math.max(1, Math.floor((paperW - margin * 2 + gutter) / (photoW + gutter)));
+    const rows = Math.max(1, Math.floor((paperH - margin * 2 + gutter) / (photoH + gutter)));
     const capacity = columns * rows;
     const placed = Math.min(requestedCopies, capacity);
     const copyStatus = requestedCopies > capacity
@@ -1970,9 +1971,9 @@ async function runIdPrintSheet(runFiles) {
     setRunBusy(false);
   }
 }
-async function generateIdSheet(image, photoW, photoH, paperW, paperH, copies) {
+async function generateIdSheet(image, photoW, photoH, paperW, paperH, copies, margin, gutter) {
   const worker = new Worker("./pdf-worker.js");
-  const payload = {idSheet: true, image, photoW, photoH, paperW, paperH, copies};
+  const payload = {idSheet: true, image, photoW, photoH, paperW, paperH, copies, margin, gutter};
   return new Promise((resolve, reject) => {
     worker.onmessage = (event) => { worker.terminate(); event.data.ok ? resolve(event.data.bytes) : reject(new Error(event.data.error)); };
     worker.onerror = (event) => { worker.terminate(); reject(event.error || new Error("Print-sheet worker failed")); };
