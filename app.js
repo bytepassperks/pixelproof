@@ -1578,7 +1578,7 @@ async function processOne(file, op) {
       .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, "")
       .replace(/\s(?:href|xlink:href)\s*=\s*(['"])(?!#).*?\1/gi, "");
     const viewBox = cleaned.match(/viewBox\s*=\s*["']\s*([\d.+-]+)[ ,]+([\d.+-]+)[ ,]+([\d.+-]+)[ ,]+([\d.+-]+)\s*["']/i);
-    const replacement = `<svg width="${width}" height="${height}"${viewBox ? ` viewBox="${viewBox.slice(1).join(" ")}` : ""}`;
+    const replacement = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"${viewBox ? ` viewBox="${viewBox.slice(1).join(" ")}` : ""}`;
     const svgBlob = new Blob([cleaned.replace(/<svg\b/i, replacement)], {type: "image/svg+xml"});
     const svgUrl = URL.createObjectURL(svgBlob);
     try {
