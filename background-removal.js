@@ -199,6 +199,7 @@ export async function runBackground({ files, status, preview, controls }) {
   if (!result) return;
   current.result = result;
   recordTask();
+  window.dispatchEvent(new Event("entitlementchange"));
   renderPreview(preview, result, controls.background.value);
   status.classList.add("success");
   status.textContent = `Ready · ${result.trimapStats.unknownPercent.toFixed(1)}% unknown band · ${formatBytes(result.buffer.byteLength)}`;

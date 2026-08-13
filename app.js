@@ -210,6 +210,30 @@ const SETTINGS_KEY = "pixelproof-tool-settings";
 const RECOVERY_DB = "pixelproof-recovery";
 const IOS_PIXEL_LIMIT = 24_000_000;
 let recoveryWrites = Promise.resolve();
+function readStoredJson(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "null");
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+function readStoredArray(key) {
+  const value = readStoredJson(key, []);
+  return Array.isArray(value) ? value : [];
+}
+function readStoredObject(key) {
+  const value = readStoredJson(key, {});
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function writeStoredJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
 const recipes = [
   {
     id: "web",
@@ -356,11 +380,7 @@ async function restoreRecovery() {
   } catch {}
 }
 function allRecipes() {
-  try {
-    return [...recipes, ...JSON.parse(localStorage.getItem(RECIPE_KEY) || "[]")];
-  } catch {
-    return recipes;
-  }
+  return [...recipes, ...readStoredArray(RECIPE_KEY)];
 }
 function initRecipes() {
   const select = $("#recipe-select");
@@ -401,9 +421,9 @@ async function importRecipe(event) {
     recipe.steps.forEach((step) => {
       if (!step?.tool || typeof step.label !== "string" || step.label.length > 160 || !step.operation || typeof step.operation !== "object" || Array.isArray(step.operation) || !toolDefs.some((tool) => tool.id === step.tool)) throw new Error("Recipe contains an unknown or invalid operation.");
     });
-    const saved = JSON.parse(localStorage.getItem(RECIPE_KEY) || "[]");
+    const saved = readStoredArray(RECIPE_KEY);
     saved.push(recipe);
-    localStorage.setItem(RECIPE_KEY, JSON.stringify(saved));
+    writeStoredJson(RECIPE_KEY, saved);
     initRecipes();
     $("#recipe-select").value = recipe.id;
     renderRecipe(recipe.id);
@@ -439,15 +459,15 @@ function setOperationValue(operation, path, value) {
   target[key] = value;
 }
 function persistRecipeSettings() {
-  const settings = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}");
+  const settings = readStoredObject("pixelproof-recipe-settings");
   settings[state.recipe.id] = {steps: state.recipe.steps};
-  localStorage.setItem("pixelproof-recipe-settings", JSON.stringify(settings));
+  writeStoredJson("pixelproof-recipe-settings", settings);
 }
 function renderRecipe(id) {
   const recipe = allRecipes().find((item) => item.id === id) || recipes[0];
   state.recipe = structuredClone(recipe);
   try {
-    const saved = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}")[id];
+    const saved = readStoredObject("pixelproof-recipe-settings")[id];
     if (saved?.steps) state.recipe.steps = saved.steps;
   } catch {}
   $("#recipe-steps").innerHTML = state.recipe.steps.map((step, index) => `<details class="recipe-step" open><summary><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(operationLabel(step))}</strong><em>${escapeHtml(step.label)}</em></summary><div class="recipe-fields"><label class="recipe-field recipe-operation"><span>Operation</span><select data-step="${index}" class="recipe-tool">${toolDefs.map((tool) => `<option value="${tool.id}" ${tool.id === step.tool ? "selected" : ""}>${escapeHtml(tool.label)}</option>`).join("")}</select></label>${operationControls(step.operation)}</div><details class="recipe-advanced"><summary>Advanced operation data</summary><textarea data-step-json="${index}" aria-label="Advanced recipe step JSON">${escapeHtml(JSON.stringify(step.operation, null, 2))}</textarea><small>Edit the underlying operation only if you need a value not shown above.</small></details></details>`).join("") + (state.recipe.note ? `<p class="hint">${escapeHtml(state.recipe.note)}</p>` : "");
@@ -479,9 +499,9 @@ function renderRecipe(id) {
   });
   $("#recipe-steps").querySelectorAll(".recipe-tool").forEach((select) => select.onchange = () => {
     state.recipe.steps[Number(select.dataset.step)].tool = select.value;
-    const settings = JSON.parse(localStorage.getItem("pixelproof-recipe-settings") || "{}");
+    const settings = readStoredObject("pixelproof-recipe-settings");
     settings[state.recipe.id] = {steps: state.recipe.steps};
-    localStorage.setItem("pixelproof-recipe-settings", JSON.stringify(settings));
+    writeStoredJson("pixelproof-recipe-settings", settings);
     $("#recipe-status").textContent = "Tool type updated. Edit its operation below.";
   });
 }
@@ -490,9 +510,9 @@ function saveRecipe() {
   const name = window.prompt("Name this recipe", state.recipe.name);
   if (!name?.trim()) return;
   const custom = {...state.recipe, id: `custom-${Date.now()}`, name: name.trim().slice(0, 80)};
-  const saved = JSON.parse(localStorage.getItem(RECIPE_KEY) || "[]");
+  const saved = readStoredArray(RECIPE_KEY);
   saved.push(custom);
-  localStorage.setItem(RECIPE_KEY, JSON.stringify(saved));
+  writeStoredJson(RECIPE_KEY, saved);
   initRecipes();
   $("#recipe-select").value = custom.id;
   renderRecipe(custom.id);
@@ -672,7 +692,7 @@ window.addEventListener("online", () => announce("Connection restored. Local pro
 $("#reset-tool").onclick = () => {
   const all = savedSettings();
   delete all[state.tool];
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(all));
+  writeStoredJson(SETTINGS_KEY, all);
   renderControls();
 };
 $("#run-button").onclick = () =>
@@ -760,6 +780,18 @@ function addFiles(list, isSample = false, append = false) {
   $("#controls").hidden = false;
   renderControls();
 }
+function refreshJobLimit() {
+  const summary = $("#file-summary");
+  const spans = summary?.querySelectorAll(":scope > span");
+  if (!spans?.[1]) return;
+  const entitlement = getEntitlementState();
+  const jobLimit = entitlement.tasksPerDay === Infinity
+    ? "unlimited jobs"
+    : `${Math.max(0, entitlement.tasksPerDay - entitlement.tasksUsed)} jobs left today`;
+  const oversized = state.files.some((file) => file.size > PRODUCT.maxPixels * 4);
+  spans[1].textContent = `${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}`;
+}
+window.addEventListener("entitlementchange", refreshJobLimit);
 function clearFiles() {
   if (state.running) {
     $("#run-status").textContent = "A job is running. Cancel it before clearing the selection.";
@@ -878,7 +910,7 @@ function renderAnimationWarning() {
   output.innerHTML = `<div class="warning-callout"><strong>Animated input detected:</strong> ${state.animationFiles.map(escapeHtml).join(", ")}. Only the first frame will be processed; animation will not be preserved. <label class="check"><input id="allow-animation" type="checkbox"> I understand</label></div>`;
 }
 function savedSettings() {
-  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"); } catch { return {}; }
+  return readStoredObject(SETTINGS_KEY);
 }
 function persistSettings() {
   const values = {};
@@ -887,7 +919,7 @@ function persistSettings() {
   });
   const all = savedSettings();
   all[state.tool] = values;
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(all));
+  writeStoredJson(SETTINGS_KEY, all);
 }
 function restoreSettings() {
   const values = savedSettings()[state.tool] || {};
@@ -996,7 +1028,7 @@ function renderControls() {
   else if (id === "image-to-pdf")
     html = `<p class="hint">PDFs embed re-encoded JPEG pages at a size-conscious quality. Drag pages below to change their order. A combined PDF or one PDF per image can be exported.</p><div id="pdf-pages" class="pdf-pages"></div><div class="form-grid">${field("Page size", '<select id="pdfSize"><option value="a4">A4</option><option value="letter">US Letter</option><option value="match">Match image</option></select>')}${field("Orientation", '<select id="pdfOrientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>')}${field("Image framing", '<select id="pdfMode"><option value="fit">Fit — no crop</option><option value="fill">Fill — crop edges</option></select>')}${field("Margins (mm)", '<input id="pdfMargin" type="number" min="0" max="50" step="1" value="10">')}${field("Output", '<select id="pdfOutput"><option value="combined">One combined PDF</option><option value="single">One PDF per image</option></select>')}</div><p id="pdf-status" class="hint"></p>`;
   else if (id === "platform-profiles") {
-    const profiles = [...PLATFORM_PROFILES, ...JSON.parse(localStorage.getItem("pixelproof-platform-profiles") || "[]")];
+    const profiles = [...PLATFORM_PROFILES, ...readStoredArray("pixelproof-platform-profiles")];
     html = `<p class="hint">These are starting points based on published guidance. They are editable, date-stamped references—not platform approval or a compliance guarantee.</p><div class="form-grid">${field("Profile", `<select id="platformProfile">${profiles.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>`).join("")}</select>`)}${field("Width (px)", '<input id="platformWidth" type="number" min="1" value="1200">')}${field("Height (px)", '<input id="platformHeight" type="number" min="1" value="800">')}${field("Framing", '<select id="platformMode"><option value="fit">Fit — no crop</option><option value="fill">Fill — crop edges</option></select>')}${field("Output", '<select id="platformMime"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select>')}</div><div id="platform-source" class="profile-source"></div><button class="text-button" id="save-platform-profile">Save as editable profile</button>`;
   } else if (id === "id-print-sheet")
     html = `<p class="warning-callout"><strong>DIMENSIONS AND PRINT LAYOUT ONLY.</strong> PixelProof does not check face position, expression, lighting, background, editing rules, eligibility, or application acceptance.</p><div class="form-grid">${field("Photo profile", '<select id="idProfile"><option value="us">US passport · 2×2 in / 51×51 mm</option><option value="ca">Canada passport · 50×70 mm</option><option value="uk">UK passport · 35×45 mm</option></select>')}${field("Paper", '<select id="idPaper"><option value="4x6">4×6 inch</option><option value="a4">A4</option></select>')}${field("Copies", '<input id="idCopies" type="number" min="1" max="20" value="6">')}</div><p class="hint">Sources and checked dates are shown before export. Use the result as a print layout, not proof of acceptance.</p><div id="id-source" class="profile-source"></div>`;
@@ -1087,7 +1119,7 @@ function renderPdfPages() {
 }
 function setupPlatformProfileControls() {
   const select = $("#platformProfile"), source = $("#platform-source");
-  const custom = JSON.parse(localStorage.getItem("pixelproof-platform-profiles") || "[]");
+  const custom = readStoredArray("pixelproof-platform-profiles");
   const profiles = [...PLATFORM_PROFILES, ...custom];
   const apply = () => {
     const profile = profiles.find((item) => item.id === select.value) || profiles[0];
@@ -1099,9 +1131,9 @@ function setupPlatformProfileControls() {
   $("#save-platform-profile").onclick = () => {
     const name = window.prompt("Name this editable platform profile");
     if (!name?.trim()) return;
-    const saved = JSON.parse(localStorage.getItem("pixelproof-platform-profiles") || "[]");
+    const saved = readStoredArray("pixelproof-platform-profiles");
     saved.push({id: `custom-${Date.now()}`, name: name.trim().slice(0, 80), width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mode: $("#platformMode").value, mime: $("#platformMime").value, source: "User-edited from published guidance", checked: new Date().toISOString().slice(0, 10)});
-    localStorage.setItem("pixelproof-platform-profiles", JSON.stringify(saved));
+    writeStoredJson("pixelproof-platform-profiles", saved);
     renderControls();
     $("#run-status").textContent = `Saved editable profile “${name.trim()}”.`;
   };
@@ -1222,7 +1254,7 @@ function mountPresetControls() {
   }
   const select = $("#saved-preset");
   select.innerHTML = '<option value="">Apply saved preset…</option>';
-  const presets = JSON.parse(localStorage.getItem("pixelproof-presets") || "[]");
+  const presets = readStoredArray("pixelproof-presets");
   presets.filter((preset) => preset.tool === state.tool).forEach((preset, index) => {
     const option = document.createElement("option");
     option.value = String(index);
@@ -1236,9 +1268,9 @@ function mountPresetControls() {
     $("#control-content").querySelectorAll("input[id], select[id]").forEach((input) => {
       if (input.id !== "saved-preset") values[input.id] = input.type === "checkbox" ? input.checked : input.value;
     });
-    const next = JSON.parse(localStorage.getItem("pixelproof-presets") || "[]");
+    const next = readStoredArray("pixelproof-presets");
     next.push({name: name.trim(), tool: state.tool, values});
-    localStorage.setItem("pixelproof-presets", JSON.stringify(next));
+    writeStoredJson("pixelproof-presets", next);
     mountPresetControls();
   };
   $("#export-preset").onclick = () => {
@@ -1267,9 +1299,9 @@ function mountPresetControls() {
       if (document.pixelproof !== 1 || !payload?.name || !payload?.tool || !payload?.values || !toolDefs.some((tool) => tool.id === payload.tool) || typeof payload.values !== "object" || Array.isArray(payload.values)) throw new Error("Not a valid PixelProof pipeline file.");
       payload.name = String(payload.name).trim().replace(/[^\w .-]+/g, "").slice(0, 80);
       if (!payload.name) throw new Error("Pipeline name is empty.");
-      const next = JSON.parse(localStorage.getItem("pixelproof-presets") || "[]");
+      const next = readStoredArray("pixelproof-presets");
       next.push({name: payload.name, tool: payload.tool, values: payload.values});
-      localStorage.setItem("pixelproof-presets", JSON.stringify(next));
+      writeStoredJson("pixelproof-presets", next);
       if (payload.tool === state.tool) mountPresetControls();
       $("#run-status").textContent = `Imported pipeline “${payload.name}”.`;
     } catch (error) {
@@ -1477,6 +1509,7 @@ async function runPalette() {
   output.querySelectorAll("[data-colour]").forEach((button) => button.onclick = () => navigator.clipboard?.writeText(button.dataset.colour));
   $("#download-palette").onclick = () => { const url = URL.createObjectURL(new Blob([hex.join("\n")], {type: "text/plain"})); const link = document.createElement("a"); link.href = url; link.download = `${stem(file.name)}-palette.txt`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 500); };
   recordTask();
+  refreshJobLimit();
 }
 async function options() {
   const id = state.tool,
@@ -1849,7 +1882,10 @@ async function run(runFiles = state.files, isSample = false) {
   );
   await recoveryWrites;
   state.results = outputs;
-  if (!isSample) recordTask();
+  if (!isSample) {
+    recordTask();
+    refreshJobLimit();
+  }
   renderResults();
   setProgress(done, tasks.length);
   if (returnFocus) $("#result-list .result-download, #result-list .retry-result")?.focus();
@@ -1931,6 +1967,7 @@ async function runPdfWorkspace(runFiles) {
     const total = state.results.reduce((sum, result) => sum + result.bytes.byteLength, 0);
     $("#run-status").textContent = `PDF ready: ${Math.round(total / 1024)} KB across ${state.results.length} file${state.results.length === 1 ? "" : "s"}.`;
     recordTask();
+    refreshJobLimit();
   } catch (error) {
     state.results = [{source: "PDF export", error: friendlyError(error)}]; renderResults();
     $("#run-status").textContent = `PDF export failed: ${friendlyError(error)}`;
@@ -1966,6 +2003,7 @@ async function runIdPrintSheet(runFiles) {
       : ` ${placed} copies placed.`;
     $("#run-status").textContent = `Print sheet ready: ${photoW}×${photoH} mm photos on ${paperW}×${paperH} mm paper.${copyStatus} Dimensions only; review all official requirements yourself.`;
     recordTask();
+    refreshJobLimit();
   } finally {
     state.running = false;
     setRunBusy(false);
@@ -2057,6 +2095,7 @@ async function runRecipe() {
     await recoveryWrites;
     state.results = outputs;
     recordTask();
+    refreshJobLimit();
     renderResults();
     $("#result-summary").textContent = resultSummary(outputs);
     setProgress(files.length, files.length);

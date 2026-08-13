@@ -5,7 +5,12 @@ const LICENSE_STATE = 'pixelproof-license-state';
 const TASK_STATE = 'pixelproof-task-state';
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const date = new Date();
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 function readLicense() {
@@ -25,7 +30,10 @@ function activeTier() {
 function usedToday() {
   try {
     const value = JSON.parse(localStorage.getItem(TASK_STATE) || 'null');
-    return value?.date === today() ? Number(value.count || 0) : 0;
+    const count = Number(value?.count);
+    return value?.date === today() && Number.isFinite(count) && Number.isInteger(count) && count >= 0
+      ? count
+      : 0;
   } catch {
     return 0;
   }
@@ -38,8 +46,10 @@ export function getEntitlementState() {
 }
 
 export function setLicenseKey(key) {
-  if (key) localStorage.setItem(LICENSE_KEY, key.trim());
-  else localStorage.removeItem(LICENSE_KEY);
+  try {
+    if (key) localStorage.setItem(LICENSE_KEY, key.trim());
+    else localStorage.removeItem(LICENSE_KEY);
+  } catch {}
 }
 
 export function getLicenseKey() {
@@ -47,13 +57,17 @@ export function getLicenseKey() {
 }
 
 export function setLicenseState(value) {
-  if (value?.valid && TIERS[value.tier]) localStorage.setItem(LICENSE_STATE, JSON.stringify(value));
-  else localStorage.removeItem(LICENSE_STATE);
+  try {
+    if (value?.valid && TIERS[value.tier]) localStorage.setItem(LICENSE_STATE, JSON.stringify(value));
+    else localStorage.removeItem(LICENSE_STATE);
+  } catch {}
 }
 
 export function recordTask() {
   const value = {date: today(), count: usedToday() + 1};
-  localStorage.setItem(TASK_STATE, JSON.stringify(value));
+  try {
+    localStorage.setItem(TASK_STATE, JSON.stringify(value));
+  } catch {}
   return value.count;
 }
 
