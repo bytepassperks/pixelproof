@@ -2085,9 +2085,11 @@ async function runPdfWorkspace(runFiles) {
       return generatePdf(items, {pageWidth, pageHeight, margin, mode: $("#pdfMode").value});
     };
     if (output === "single") {
+      const usedNames = new Map();
       for (let index = 0; index < images.length; index++) {
         const bytes = await make([images[index]]);
-        state.results.push({name: `${stem(images[index].source.name)}.pdf`, bytes, mime: "application/pdf", source: images[index].source.name, sourcePath: relativePath(images[index].source), originalBytes: images[index].source.size});
+        const name = uniqueName(`${stem(images[index].source.name)}.pdf`, usedNames);
+        state.results.push({name, bytes, mime: "application/pdf", source: images[index].source.name, sourcePath: relativePath(images[index].source), originalBytes: images[index].source.size});
       }
     } else {
       const bytes = await make(images);
