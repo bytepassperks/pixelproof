@@ -2385,14 +2385,13 @@ async function saveResultsToFolder(results) {
     for (const part of parts) directory = await directory.getDirectoryHandle(part, {create});
     return directory;
   };
-  const nextName = (name, used) => {
+  const nextName = (name, used, index) => {
     const dot = name.lastIndexOf(".");
     const base = dot > 0 ? name.slice(0, dot) : name;
     const extension = dot > 0 ? name.slice(dot) : "";
-    let index = 2;
     let candidate = `${base}-${index}${extension}`;
     while (used.has(candidate)) candidate = `${base}-${++index}${extension}`;
-    return candidate;
+    return {candidate, index};
   };
   try {
     const total = results.reduce((sum, result) => sum + result.bytes.byteLength, 0);
@@ -2438,10 +2437,12 @@ async function saveResultsToFolder(results) {
       if (!usedByDirectory.has(key)) usedByDirectory.set(key, new Set());
       const used = usedByDirectory.get(key);
       if (action === "keep" && item.exists) {
+        let suffix = 2;
         while (true) {
           try {
             await directory.getFileHandle(filename);
-            filename = nextName(filename, used);
+            const next = nextName(item.filename, used, suffix++);
+            filename = next.candidate;
           } catch (error) {
             if (error?.name === "NotFoundError") break;
             throw error;
