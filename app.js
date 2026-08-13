@@ -1950,12 +1950,20 @@ async function runIdPrintSheet(runFiles) {
   try {
     const [photoW, photoH] = profiles[$("#idProfile").value], [paperW, paperH] = papers[$("#idPaper").value];
     setProgress(0, 1);
-    const image = await imageForPdf(file);
-    const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, Number($("#idCopies").value || 1));
+    const requestedCopies = Number($("#idCopies").value || 1);
+    const image = await imageForPdf(file, undefined, photoW / photoH);
+    const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, requestedCopies);
     state.results = [{name: `${stem(file.name)}-${$("#idProfile").value}-print-sheet.pdf`, bytes, mime: "application/pdf", source: file.name, originalBytes: file.size}];
     renderResults();
     setProgress(1, 1);
-    $("#run-status").textContent = `Print sheet ready: ${photoW}×${photoH} mm photos on ${paperW}×${paperH} mm paper. Dimensions only; review all official requirements yourself.`;
+    const columns = Math.max(1, Math.floor(paperW / photoW));
+    const rows = Math.max(1, Math.floor(paperH / photoH));
+    const capacity = columns * rows;
+    const placed = Math.min(requestedCopies, capacity);
+    const copyStatus = requestedCopies > capacity
+      ? ` ${placed} of ${requestedCopies} requested copies fit on the sheet.`
+      : ` ${placed} copies placed.`;
+    $("#run-status").textContent = `Print sheet ready: ${photoW}×${photoH} mm photos on ${paperW}×${paperH} mm paper.${copyStatus} Dimensions only; review all official requirements yourself.`;
     recordTask();
   } finally {
     state.running = false;

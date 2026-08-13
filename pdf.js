@@ -8,7 +8,7 @@ export function pdfPageSize(size, orientation, width, height) {
   return page;
 }
 
-export async function imageForPdf(file, svgSize = {width: 1200, height: 1200}) {
+export async function imageForPdf(file, svgSize = {width: 1200, height: 1200}, cropAspect = 0) {
   let input = file;
   if (file.name.toLowerCase().endsWith(".svg") || file.type === "image/svg+xml") {
     const text = await file.text();
@@ -27,14 +27,20 @@ export async function imageForPdf(file, svgSize = {width: 1200, height: 1200}) {
     input = new File([decoded.buffer], `${file.name}.png`, {type: "image/png"});
   }
   const bitmap = await createImageBitmap(input);
-  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+  const sourceAspect = bitmap.width / bitmap.height;
+  const crop = cropAspect
+    ? sourceAspect > cropAspect
+      ? {width: Math.round(bitmap.height * cropAspect), height: bitmap.height, x: Math.round((bitmap.width - bitmap.height * cropAspect) / 2), y: 0}
+      : {width: bitmap.width, height: Math.round(bitmap.width / cropAspect), x: 0, y: Math.round((bitmap.height - bitmap.width / cropAspect) / 2)}
+    : {width: bitmap.width, height: bitmap.height, x: 0, y: 0};
+  const scale = Math.min(1, 1800 / Math.max(crop.width, crop.height));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.width = Math.max(1, Math.round(crop.width * scale));
+  canvas.height = Math.max(1, Math.round(crop.height * scale));
   const ctx = canvas.getContext("2d", {alpha: false});
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", .82));
   return {bytes: await blob.arrayBuffer(), mime: "image/jpeg", width: canvas.width, height: canvas.height};
