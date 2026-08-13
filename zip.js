@@ -26,10 +26,10 @@ export async function downloadZip(entries, filename = 'pixelproof-results.zip') 
     const name = encoder.encode(entry.name), raw = new Uint8Array(entry.bytes);
     const compressed = await deflate(raw), method = compressed.length < raw.length ? 8 : 0;
     const payload = method ? compressed : raw, crc = crc32(raw);
-    const header = concat([u32(0x04034b50), u16(20), u16(0), u16(method), u16(0),
+    const header = concat([u32(0x04034b50), u16(20), u16(0x800), u16(method), u16(0),
       u16(0), u32(crc), u32(payload.length), u32(raw.length), u16(name.length), u16(0), name]);
     local.push(header, payload);
-    central.push(concat([u32(0x02014b50), u16(20), u16(20), u16(0), u16(method), u16(0),
+    central.push(concat([u32(0x02014b50), u16(20), u16(20), u16(0x800), u16(method), u16(0),
       u16(0), u32(crc), u32(payload.length), u32(raw.length), u16(name.length), u16(0),
       u16(0), u16(0), u16(0), u32(0), u32(offset), name]));
     offset += header.length + payload.length;
