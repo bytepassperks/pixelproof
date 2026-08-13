@@ -1579,7 +1579,26 @@ async function processOne(file, op) {
       .replace(/\s(?:href|xlink:href)\s*=\s*(['"])(?!#).*?\1/gi, "");
     const viewBox = cleaned.match(/viewBox\s*=\s*["']\s*([\d.+-]+)[ ,]+([\d.+-]+)[ ,]+([\d.+-]+)[ ,]+([\d.+-]+)\s*["']/i);
     const replacement = `<svg width="${width}" height="${height}"${viewBox ? ` viewBox="${viewBox.slice(1).join(" ")}` : ""}`;
-    input = new File([cleaned.replace(/<svg\b/i, replacement)], `${file.name}.svg`, {type: "image/svg+xml"});
+    const svgBlob = new Blob([cleaned.replace(/<svg\b/i, replacement)], {type: "image/svg+xml"});
+    const svgUrl = URL.createObjectURL(svgBlob);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error("The SVG could not be rasterised."));
+        element.src = svgUrl;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(image, 0, 0, width, height);
+      const raster = await new Promise((resolve, reject) =>
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("The SVG could not be rasterised.")), "image/png"),
+      );
+      input = new File([await raster.arrayBuffer()], `${file.name}.png`, {type: "image/png"});
+    } finally {
+      URL.revokeObjectURL(svgUrl);
+    }
     if (op.type === "svg-raster") op = {...op, type: "resize"};
   }
   if (isHeic(file)) {
