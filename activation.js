@@ -1,5 +1,5 @@
 import {PRODUCT} from './config.js';
-import {getLicenseKey, setLicenseKey, setLicenseState, LICENSE_API_URL} from './entitlements.js';
+import {getEntitlementState, getLicenseKey, setLicenseKey, setLicenseState, LICENSE_API_URL} from './entitlements.js';
 
 document.querySelectorAll('[data-brand]').forEach(element => {
   element.textContent = PRODUCT.brand;
@@ -9,6 +9,9 @@ const form = document.querySelector('#activation-form');
 const input = document.querySelector('#license-key');
 const status = document.querySelector('#activation-status');
 input.value = getLicenseKey();
+const currentEntitlement = getEntitlementState();
+if (input.value && currentEntitlement.tier !== "free")
+  status.textContent = `${currentEntitlement.label} is active on this browser.`;
 form.onsubmit = async event => {
   event.preventDefault();
   const key = input.value.trim();

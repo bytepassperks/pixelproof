@@ -35,12 +35,21 @@ document.querySelectorAll('[data-checkout]').forEach(button => {
         signal: controller.signal,
       });
       clearTimeout(timer);
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Checkout service returned an invalid response.");
+      }
       if (!response.ok || !data.checkout_url) throw new Error(data.error || 'Checkout is temporarily unavailable.');
       window.location.href = data.checkout_url;
     } catch (error) {
       clearTimeout(timer);
-      status.textContent = error.name === 'AbortError' ? 'Checkout timed out. Please try again.' : error.message;
+      status.textContent = error.name === 'AbortError'
+        ? 'Checkout timed out. Please try again.'
+        : error instanceof TypeError
+          ? 'Checkout service could not be reached. Please try again.'
+          : error.message;
       button.disabled = false;
     }
   };
