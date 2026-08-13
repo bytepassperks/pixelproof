@@ -365,7 +365,7 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
   .proof-compare-panel figcaption{bottom:var(--space-2);left:var(--space-2);right:var(--space-2);text-align:left}
   .proof-compare-legend{display:none}
 }
-.pdf-page{touch-action:none}
+.drag-handle{align-items:center;display:inline-flex;font:18px ui-monospace,monospace;justify-content:center;min-height:44px;min-width:44px;padding:0;touch-action:none}
 @media(max-width:600px){
   .app-shell .recipe-toolbar .text-button{
     min-height:44px;

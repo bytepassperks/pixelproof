@@ -1221,8 +1221,17 @@ function renderPdfPages() {
   const list = $("#pdf-pages");
   if (!list) return;
   const files = state.pdfOrder.length ? state.pdfOrder : state.files;
-  list.innerHTML = files.map((file, index) => `<div class="pdf-page" draggable="true" data-index="${index}"><span class="drag-handle">☷</span><strong>${index + 1}</strong><span>${escapeHtml(relativePath(file))}</span></div>`).join("");
+  list.innerHTML = files.map((file, index) => `<div class="pdf-page" draggable="true" data-index="${index}"><button class="drag-handle" type="button" aria-label="Reorder page ${index + 1}">☷</button><strong>${index + 1}</strong><span>${escapeHtml(relativePath(file))}</span></div>`).join("");
   let dragged;
+  const movePage = (from, target) => {
+    if (from === target || target < 0 || target >= files.length) return;
+    const ordered = [...files];
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(target, 0, moved);
+    state.pdfOrder = ordered;
+    renderPdfPages();
+    list.querySelector(`.drag-handle[aria-label="Reorder page ${target + 1}"]`)?.focus();
+  };
   list.querySelectorAll(".pdf-page").forEach((page) => {
     page.ondragstart = () => { dragged = Number(page.dataset.index); page.classList.add("dragging"); };
     page.ondragend = () => page.classList.remove("dragging");
@@ -1230,30 +1239,34 @@ function renderPdfPages() {
     page.ondrop = (event) => {
       event.preventDefault();
       const target = Number(page.dataset.index);
-      const ordered = [...files];
-      const [moved] = ordered.splice(dragged, 1);
-      ordered.splice(target, 0, moved);
-      state.pdfOrder = ordered;
-      renderPdfPages();
+      movePage(dragged, target);
     };
-    page.onpointerdown = (event) => {
+    const handle = page.querySelector(".drag-handle");
+    handle.onkeydown = (event) => {
+      const index = Number(page.dataset.index);
+      if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        movePage(index, index - 1);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+        event.preventDefault();
+        movePage(index, index + 1);
+      }
+    };
+    handle.onpointerdown = (event) => {
       dragged = Number(page.dataset.index);
       page.classList.add("dragging");
-      page.setPointerCapture?.(event.pointerId);
+      handle.setPointerCapture?.(event.pointerId);
     };
-    page.onpointerup = (event) => {
+    handle.onpointerup = (event) => {
       if (dragged === undefined) return;
       const targetPage = document.elementFromPoint(event.clientX, event.clientY)?.closest(".pdf-page");
       const target = targetPage ? Number(targetPage.dataset.index) : dragged;
+      const from = dragged;
       page.classList.remove("dragging");
-      const ordered = [...files];
-      const [moved] = ordered.splice(dragged, 1);
-      ordered.splice(target, 0, moved);
       dragged = undefined;
-      state.pdfOrder = ordered;
-      renderPdfPages();
+      movePage(from, target);
     };
-    page.onpointercancel = () => {
+    handle.onpointercancel = () => {
       dragged = undefined;
       page.classList.remove("dragging");
     };
