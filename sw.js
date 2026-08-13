@@ -1,8 +1,9 @@
-const CACHE = "pixelproof-shell-20260813-76";
+const CACHE = "pixelproof-shell-20260813-85";
 const SHELL = [
   "./",
   "./index.html",
   "./app.html",
+  "./app",
   "./activate.html",
   "./styles.css",
   "./vendor/fonts/alternatives/PlusJakartaSans-Latin.woff2",
@@ -56,7 +57,7 @@ self.addEventListener("install", (event) => {
 });
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()),
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith("pixelproof-shell-") && key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()),
   );
 });
 self.addEventListener("fetch", (event) => {
@@ -70,7 +71,7 @@ self.addEventListener("fetch", (event) => {
   }
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match("./app.html")));
+    event.respondWith(fetch(request).catch(() => caches.match(new URL("./app.html", self.location).href)));
     return;
   }
   event.respondWith(
