@@ -217,6 +217,10 @@ const state = {
   resultToolId: "",
   resultToolLabel: "",
 };
+const activeWorkers = new Map();
+function cancelActiveWorkers() {
+  activeWorkers.forEach((cancel) => cancel());
+}
 const supportedFormats = new Set();
 const originalStats = new WeakMap();
 const RECIPE_KEY = "pixelproof-recipes";
@@ -761,11 +765,16 @@ $("#reset-tool").onclick = () => {
   writeStoredJson(SETTINGS_KEY, all);
   renderControls();
 };
-$("#run-button").onclick = () =>
-  state.running ? (state.cancel = true) : run();
+$("#run-button").onclick = () => {
+  if (state.running) {
+    state.cancel = true;
+    cancelActiveWorkers();
+  } else run();
+};
 function selectTool(id) {
   if (state.running) {
     state.cancel = true;
+    cancelActiveWorkers();
     const current = toolDefs.find((tool) => tool.id === state.tool);
     $("#run-status").textContent = `${current?.label || "The current tool"} is still running. Use Cancel current job to stop it before switching tools.`;
     $("#run-button").focus();
@@ -1749,7 +1758,7 @@ function escapeHtml(value) {
     "'": "&#39;",
   }[character]));
 }
-async function processOne(file, op) {
+async function processOne(file, op, onProgress = () => {}) {
   let input = file;
   if (file.name.toLowerCase().endsWith(".svg") || file.type === "image/svg+xml") {
     const text = await file.text();
@@ -1797,21 +1806,41 @@ async function processOne(file, op) {
   const worker = new Worker("./worker.js", {type: "module"});
   return new Promise((resolve, reject) => {
     let started = false;
+    let settled = false;
     let lastSignal = Date.now();
+    const removeWorker = () => activeWorkers.delete(worker);
+    const cancel = () => {
+      if (settled) return;
+      settled = true;
+      clearInterval(watchdog);
+      removeWorker();
+      worker.terminate();
+      const error = new Error("Job cancelled.");
+      error.cancelled = true;
+      reject(error);
+    };
+    activeWorkers.set(worker, cancel);
     const watchdog = setInterval(() => {
       const limit = started ? WORKER_STALL_TIMEOUT_MS : WORKER_START_TIMEOUT_MS;
       if (Date.now() - lastSignal < limit) return;
       clearInterval(watchdog);
+      removeWorker();
       worker.terminate();
       reject(new Error("Image worker stalled."));
     }, 1_000);
     worker.onmessage = (e) => {
       lastSignal = Date.now();
+      if (Number.isFinite(e.data.progress)) {
+        onProgress(Math.max(0, Math.min(1, e.data.progress)));
+        return;
+      }
       if (e.data.started || e.data.heartbeat) {
         started ||= e.data.started === true;
         return;
       }
       clearInterval(watchdog);
+      settled = true;
+      removeWorker();
       worker.terminate();
       if (e.data.ok) resolve(e.data);
       else {
@@ -1822,6 +1851,8 @@ async function processOne(file, op) {
     };
     worker.onerror = (e) => {
       clearInterval(watchdog);
+      settled = true;
+      removeWorker();
       worker.terminate();
       reject(e.error || new Error("Worker failed"));
     };
@@ -1840,6 +1871,8 @@ async function processOne(file, op) {
       }),
     ).catch((error) => {
       clearInterval(watchdog);
+      settled = true;
+      removeWorker();
       worker.terminate();
       reject(error);
     });
@@ -2028,7 +2061,9 @@ async function run(runFiles = state.files, isSample = false) {
       $("#run-status").textContent =
         `Processing ${done + 1} of ${tasks.length}: ${task.file.name} · ${done} finished · ${tasks.length - done - 1} remaining`;
       try {
-        const result = await processOne(task.file, task.op);
+        const result = await processOne(task.file, task.op, (progress) =>
+          setProgress(done + progress, tasks.length),
+        );
         outputs.push({
           name: uniqueName(outputName(task, result), usedNames),
           ...result,
@@ -2042,6 +2077,7 @@ async function run(runFiles = state.files, isSample = false) {
         });
         rememberOutput(outputs[outputs.length - 1]);
       } catch (error) {
+        if (error.cancelled) break;
         outputs.push({
           name: task.name,
           error: friendlyError(error),

@@ -1,5 +1,6 @@
 import { injectJpegExif } from "./metadata.js";
 
+let reportProgress = () => {};
 function userFacingError(message) {
   const error = new Error(message);
   error.userFacing = true;
@@ -27,7 +28,7 @@ function drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
   const input = sourceContext.getImageData(0, 0, sourceWidth, sourceHeight).data;
   const horizontal = new Float32Array(targetWidth * sourceHeight * 4);
   const horizontalWeights = [];
-  const horizontalScale = sourceWidth / targetWidth;
+  const horizontalScale = Math.max(1, sourceWidth / targetWidth);
   for (let x = 0; x < targetWidth; x += 1) {
     const center = (x + 0.5) * sourceWidth / targetWidth - 0.5;
     const radius = 3 * horizontalScale;
@@ -53,9 +54,10 @@ function drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
         horizontal[output + 3] += input[inputOffset + 3] * weight;
       }
     }
+    if (y % 64 === 0) reportProgress(0.5 * y / sourceHeight);
   }
   const outputValues = new Float32Array(targetWidth * targetHeight * 4);
-  const verticalScale = sourceHeight / targetHeight;
+  const verticalScale = Math.max(1, sourceHeight / targetHeight);
   for (let y = 0; y < targetHeight; y += 1) {
     const center = (y + 0.5) * sourceHeight / targetHeight - 0.5;
     const radius = 3 * verticalScale;
@@ -68,6 +70,7 @@ function drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
       weights.push([sourceY, weight]);
       total += weight;
     }
+    if (y % 32 === 0) reportProgress(0.5 + 0.5 * y / targetHeight);
     for (let x = 0; x < targetWidth; x += 1) {
       const outputOffset = (y * targetWidth + x) * 4;
       for (const [sourceY, weight] of weights) {
@@ -84,9 +87,89 @@ function drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
   targetCanvas.getContext("2d").putImageData(new ImageData(output, targetWidth, targetHeight), 0, 0);
   ctx.drawImage(targetCanvas, dx, dy, dw, dh);
 }
+function drawLanczosTiled(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
+  const sourceWidth = Math.max(1, Math.ceil(sw)), sourceHeight = Math.max(1, Math.ceil(sh));
+  const targetWidth = Math.max(1, Math.round(dw)), targetHeight = Math.max(1, Math.round(dh));
+  const horizontalScale = Math.max(1, sourceWidth / targetWidth);
+  const verticalScale = Math.max(1, sourceHeight / targetHeight);
+  const horizontalRadius = 3 * horizontalScale;
+  const horizontalWeights = [];
+  for (let x = 0; x < targetWidth; x += 1) {
+    const center = (x + 0.5) * sourceWidth / targetWidth - 0.5;
+    const first = Math.floor(center - horizontalRadius + 1);
+    const weights = [];
+    let total = 0;
+    for (let tap = 0; tap <= horizontalRadius * 2; tap += 1) {
+      const sourceX = Math.min(sourceWidth - 1, Math.max(0, first + tap));
+      const weight = lanczosWeight((center - (first + tap)) / horizontalScale);
+      weights.push([sourceX, weight]);
+      total += weight;
+    }
+    horizontalWeights.push(weights.map(([sourceX, weight]) => [sourceX, weight / total]));
+  }
+  const tileRows = 128;
+  for (let tileStart = 0; tileStart < targetHeight; tileStart += tileRows) {
+    const tileEnd = Math.min(targetHeight, tileStart + tileRows);
+    const firstCenter = (tileStart + 0.5) * sourceHeight / targetHeight - 0.5;
+    const lastCenter = (tileEnd - 0.5) * sourceHeight / targetHeight - 0.5;
+    const sourceStart = Math.max(0, Math.floor(firstCenter - 3 * verticalScale + 1));
+    const sourceEnd = Math.min(sourceHeight, Math.floor(lastCenter + 3 * verticalScale) + 1);
+    const tileSourceHeight = Math.max(1, sourceEnd - sourceStart);
+    const sourceCanvas = new OffscreenCanvas(sourceWidth, tileSourceHeight);
+    const sourceContext = sourceCanvas.getContext("2d");
+    sourceContext.imageSmoothingEnabled = false;
+    sourceContext.drawImage(source, sx, sy + sourceStart, sw, tileSourceHeight, 0, 0, sourceWidth, tileSourceHeight);
+    const input = sourceContext.getImageData(0, 0, sourceWidth, tileSourceHeight).data;
+    const horizontal = new Float32Array(targetWidth * tileSourceHeight * 4);
+    for (let y = 0; y < tileSourceHeight; y += 1) {
+      for (let x = 0; x < targetWidth; x += 1) {
+        const output = (y * targetWidth + x) * 4;
+        for (const [sourceX, weight] of horizontalWeights[x]) {
+          const inputOffset = (y * sourceWidth + sourceX) * 4;
+          horizontal[output] += input[inputOffset] * weight;
+          horizontal[output + 1] += input[inputOffset + 1] * weight;
+          horizontal[output + 2] += input[inputOffset + 2] * weight;
+          horizontal[output + 3] += input[inputOffset + 3] * weight;
+        }
+      }
+    }
+    const outputValues = new Float32Array(targetWidth * (tileEnd - tileStart) * 4);
+    for (let y = tileStart; y < tileEnd; y += 1) {
+      const center = (y + 0.5) * sourceHeight / targetHeight - 0.5;
+      const first = Math.floor(center - 3 * verticalScale + 1);
+      const weights = [];
+      let total = 0;
+      for (let tap = 0; tap <= 6 * verticalScale; tap += 1) {
+        const sourceY = Math.min(sourceHeight - 1, Math.max(0, first + tap));
+        const weight = lanczosWeight((center - (first + tap)) / verticalScale);
+        weights.push([sourceY - sourceStart, weight]);
+        total += weight;
+      }
+      for (let x = 0; x < targetWidth; x += 1) {
+        const outputOffset = ((y - tileStart) * targetWidth + x) * 4;
+        for (const [sourceY, weight] of weights) {
+          if (sourceY < 0 || sourceY >= tileSourceHeight) continue;
+          const inputOffset = (sourceY * targetWidth + x) * 4;
+          outputValues[outputOffset] += horizontal[inputOffset] * weight / total;
+          outputValues[outputOffset + 1] += horizontal[inputOffset + 1] * weight / total;
+          outputValues[outputOffset + 2] += horizontal[inputOffset + 2] * weight / total;
+          outputValues[outputOffset + 3] += horizontal[inputOffset + 3] * weight / total;
+        }
+      }
+    }
+    const tile = new OffscreenCanvas(targetWidth, tileEnd - tileStart);
+    tile.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(outputValues), targetWidth, tileEnd - tileStart), 0, 0);
+    ctx.drawImage(tile, dx, dy + tileStart * dh / targetHeight, dw, (tileEnd - tileStart) * dh / targetHeight);
+    reportProgress(tileEnd / targetHeight);
+  }
+}
 function drawResampled(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
   if (Math.max(sw / Math.max(1, dw), sh / Math.max(1, dh)) > 2 && sw * sh <= 32_000_000) {
     drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh);
+    return;
+  }
+  if (Math.max(sw / Math.max(1, dw), sh / Math.max(1, dh)) > 2 && sw * sh <= 64_000_000) {
+    drawLanczosTiled(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh);
     return;
   }
   if (Math.max(sw / Math.max(1, dw), sh / Math.max(1, dh)) <= 2) {
@@ -109,6 +192,7 @@ function drawResampled(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
     current = next;
     currentWidth = nextWidth;
     currentHeight = nextHeight;
+    reportProgress(0.5);
   }
   ctx.drawImage(current, 0, 0, currentWidth, currentHeight, dx, dy, dw, dh);
 }
@@ -426,6 +510,7 @@ function blurBox(ctx, box, mode, strength) {
   }
 }
 self.onmessage = async ({data}) => {
+  reportProgress = (progress) => self.postMessage({id: data.id, progress});
   const heartbeat = setInterval(() => self.postMessage({id: data.id, heartbeat: true}), 5_000);
   self.postMessage({id: data.id, started: true});
   try {
@@ -550,5 +635,5 @@ self.onmessage = async ({data}) => {
     self.postMessage({id, ok: true, ...result}, [result.bytes]);
     image.close();
   } catch (error) { self.postMessage({id: data.id, ok: false, error: error?.message || String(error), userFacing: error?.userFacing === true}); }
-  finally { clearInterval(heartbeat); }
+  finally { clearInterval(heartbeat); reportProgress = () => {}; }
 };
