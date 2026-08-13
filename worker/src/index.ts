@@ -186,10 +186,12 @@ async function webhook(request: Request, env: Env) {
   const tier = tierFromProduct(productId, env);
   const isRevocation = eventType.includes('refund') || eventType.includes('cancel') ||
     eventType.includes('expired') || eventType.includes('disabled') || eventType.includes('revoked');
-  const isActivation = eventType.includes('succeeded') || eventType.includes('created') ||
-    eventType.includes('delivered');
+  const isActivation = !isRevocation && (eventType.includes('succeeded') || eventType.includes('created') ||
+    eventType.includes('delivered'));
+  if (!isActivation && !isRevocation) return json(request, env, {ok: true, ignored: true});
   if (!key) return json(request, env, {error: 'webhook license_key is required'}, 400);
-  if (!isRevocation && (!isActivation || !tier)) return json(request, env, {error: 'webhook product is unknown'}, 400);
+  if (isActivation && !productId) return json(request, env, {error: 'webhook product_id is required'}, 400);
+  if (isActivation && !tier) return json(request, env, {error: 'webhook product is unknown'}, 400);
   const eventId = request.headers.get('webhook-id') || crypto.randomUUID();
   const inserted = await env.DB.prepare('INSERT OR IGNORE INTO webhook_events(event_id,received_at) VALUES(?1,?2)').bind(eventId, now()).run();
   if (!inserted.meta.changes) return json(request, env, {ok: true, duplicate: true});
@@ -198,7 +200,8 @@ async function webhook(request: Request, env: Env) {
     await env.DB.prepare(
       `INSERT INTO licenses(license_key,tier,email,dodo_payment_id,status,created_at,updated_at)
        VALUES(?1,?2,?3,?4,'active',?5,?5)
-       ON CONFLICT(license_key) DO UPDATE SET tier=excluded.tier,email=excluded.email,dodo_payment_id=excluded.dodo_payment_id,status='active',updated_at=excluded.updated_at`,
+       ON CONFLICT(license_key) DO UPDATE SET tier=excluded.tier,email=excluded.email,dodo_payment_id=excluded.dodo_payment_id,status='active',updated_at=excluded.updated_at
+       WHERE licenses.status != 'disabled'`,
     ).bind(key, tier, data.email || null, paymentId, now()).run();
   }
   if (isRevocation) {
