@@ -1,4 +1,5 @@
 const PDF_ASSET = "./vendor/pdf-lib/pdf-lib.min.js";
+const WORKER_TIMEOUT_MS = 30_000;
 import { decodeHeic, isHeic } from "./heic.js";
 
 export function pdfPageSize(size, orientation, width, height) {
@@ -49,11 +50,17 @@ export async function imageForPdf(file, svgSize = {width: 1200, height: 1200}, c
 export async function generatePdf(images, options) {
   const worker = new Worker("./pdf-worker.js");
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      reject(new Error("PDF worker timed out."));
+    }, WORKER_TIMEOUT_MS);
     worker.onmessage = (event) => {
+      clearTimeout(timeout);
       worker.terminate();
       event.data.ok ? resolve(event.data.bytes) : reject(new Error(event.data.error));
     };
     worker.onerror = (event) => {
+      clearTimeout(timeout);
       worker.terminate();
       reject(event.error || new Error("PDF worker failed"));
     };

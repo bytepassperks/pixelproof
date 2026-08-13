@@ -19,6 +19,7 @@ import {
 } from "./privacy.js";
 
 let estimateRequest = 0;
+const WORKER_TIMEOUT_MS = 30_000;
 
 const toolDefs = [
   {
@@ -569,7 +570,7 @@ async function renderLocalData() {
     : `${Math.round(bytes / 1024)} KB`;
   $("#local-data-summary").innerHTML = [
     `<p><strong>Recovery outputs:</strong> ${format(summary.recovery)} · retained ${summary.recoveryRetention}</p>`,
-    `<p><strong>Settings, recipes, profiles, presets, task count:</strong> ${format(summary.localStorage)}</p>`,
+    `<p><strong>Settings, recipes, profiles, presets, task count, licence state, key, and revalidation timestamp:</strong> ${format(summary.localStorage)}</p>`,
     `<p><strong>Background-removal models:</strong> ${format(summary.models)}</p>`,
   ].join("");
 }
@@ -793,6 +794,16 @@ function refreshJobLimit() {
   spans[1].textContent = `${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}`;
 }
 window.addEventListener("entitlementchange", refreshJobLimit);
+function scheduleDailyEntitlementRefresh() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(24, 0, 0, 0);
+  setTimeout(() => {
+    refreshJobLimit();
+    scheduleDailyEntitlementRefresh();
+  }, Math.max(1_000, next.getTime() - now.getTime()));
+}
+scheduleDailyEntitlementRefresh();
 function clearFiles() {
   if (state.running) {
     $("#run-status").textContent = "A job is running. Cancel it before clearing the selection.";
@@ -1624,6 +1635,8 @@ function stem(name) {
 function friendlyError(error) {
   const message = String(error?.message || error || "Unknown image-processing error.");
   if (error?.userFacing) return message;
+  if (/timed out/i.test(message))
+    return "PixelProof stopped waiting for a browser worker. Try again, or use a smaller image.";
   if (/could not be decoded|decode|invalidstateerror/i.test(message))
     return "This file could not be decoded as a supported image. Check that it is a real JPEG, PNG, WebP, HEIC/HEIF, BMP, GIF, ICO, or SVG file.";
   if (/worker failed|failed to fetch|network|out of memory|memory/i.test(message))
@@ -1693,7 +1706,12 @@ async function processOne(file, op) {
   }
   const worker = new Worker("./worker.js", {type: "module"});
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      reject(new Error("Image worker timed out."));
+    }, WORKER_TIMEOUT_MS);
     worker.onmessage = (e) => {
+      clearTimeout(timeout);
       worker.terminate();
       if (e.data.ok) resolve(e.data);
       else {
@@ -1703,6 +1721,7 @@ async function processOne(file, op) {
       }
     };
     worker.onerror = (e) => {
+      clearTimeout(timeout);
       worker.terminate();
       reject(e.error || new Error("Worker failed"));
     };
@@ -1719,7 +1738,11 @@ async function processOne(file, op) {
           transfers,
         );
       }),
-    );
+    ).catch((error) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      reject(error);
+    });
   });
 }
 function outputExtension(mime) {
@@ -2014,8 +2037,12 @@ async function generateIdSheet(image, photoW, photoH, paperW, paperH, copies, ma
   const worker = new Worker("./pdf-worker.js");
   const payload = {idSheet: true, image, photoW, photoH, paperW, paperH, copies, margin, gutter};
   return new Promise((resolve, reject) => {
-    worker.onmessage = (event) => { worker.terminate(); event.data.ok ? resolve(event.data.bytes) : reject(new Error(event.data.error)); };
-    worker.onerror = (event) => { worker.terminate(); reject(event.error || new Error("Print-sheet worker failed")); };
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      reject(new Error("Print-sheet worker timed out."));
+    }, WORKER_TIMEOUT_MS);
+    worker.onmessage = (event) => { clearTimeout(timeout); worker.terminate(); event.data.ok ? resolve(event.data.bytes) : reject(new Error(event.data.error)); };
+    worker.onerror = (event) => { clearTimeout(timeout); worker.terminate(); reject(event.error || new Error("Print-sheet worker failed")); };
     worker.postMessage(payload, [image.bytes]);
   });
 }
