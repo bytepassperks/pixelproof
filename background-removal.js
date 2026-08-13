@@ -39,7 +39,12 @@ async function cachedModel(url, onProgress) {
       throw new Error(`Cached model integrity check failed for ${modelName(url)}. Clear the model cache and try again.`);
     return bytes;
   }
-  const response = await fetch(url);
+  let response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new Error("Model download could not be reached. Check your connection.");
+  }
   if (!response.ok || !response.body)
     throw new Error(`Model download failed (${response.status}).`);
   const total = Number(response.headers.get("content-length")) || 0;
