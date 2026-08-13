@@ -85,7 +85,7 @@ function drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
   ctx.drawImage(targetCanvas, dx, dy, dw, dh);
 }
 function drawResampled(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
-  if (Math.max(sw / Math.max(1, dw), sh / Math.max(1, dh)) > 2 && sw * sh <= 16_000_000) {
+  if (Math.max(sw / Math.max(1, dw), sh / Math.max(1, dh)) > 2 && sw * sh <= 32_000_000) {
     drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh);
     return;
   }
