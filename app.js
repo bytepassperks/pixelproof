@@ -2361,23 +2361,103 @@ function renderResults() {
   }
 }
 async function saveResultsToFolder(results) {
+  const choice = $("#save-folder-choice");
+  const choiceText = $("#save-folder-choice-text");
+  const overwriteButton = $("#save-folder-overwrite");
+  const keepButton = $("#save-folder-keep");
+  const cancelButton = $("#save-folder-cancel");
+  const hideChoice = () => {
+    choice.hidden = true;
+    overwriteButton.onclick = null;
+    keepButton.onclick = null;
+    cancelButton.onclick = null;
+  };
+  const chooseCollisionAction = (names) => new Promise((resolve) => {
+    const sample = names.length > 5 ? `${names.slice(0, 5).join(", ")} and ${names.length - 5} more` : names.join(", ");
+    choiceText.textContent = `${names.length} file${names.length === 1 ? "" : "s"} already exist${names.length === 1 ? "s" : ""}: ${sample}.`;
+    choice.hidden = false;
+    overwriteButton.onclick = () => { hideChoice(); resolve("overwrite"); };
+    keepButton.onclick = () => { hideChoice(); resolve("keep"); };
+    cancelButton.onclick = () => { hideChoice(); resolve("cancel"); };
+  });
+  const getDirectory = async (root, parts, create) => {
+    let directory = root;
+    for (const part of parts) directory = await directory.getDirectoryHandle(part, {create});
+    return directory;
+  };
+  const nextName = (name, used) => {
+    const dot = name.lastIndexOf(".");
+    const base = dot > 0 ? name.slice(0, dot) : name;
+    const extension = dot > 0 ? name.slice(dot) : "";
+    let index = 2;
+    let candidate = `${base}-${index}${extension}`;
+    while (used.has(candidate)) candidate = `${base}-${++index}${extension}`;
+    return candidate;
+  };
   try {
     const total = results.reduce((sum, result) => sum + result.bytes.byteLength, 0);
     const estimate = await navigator.storage?.estimate?.();
     if (estimate?.quota && estimate.quota - estimate.usage < total * 1.2)
       announce("There may not be enough space for this folder export. Use Download ZIP or save fewer results.", "error");
     const root = await window.showDirectoryPicker({mode: "readwrite"});
+    const plan = [];
     for (const result of results) {
       const parts = result.name.split("/");
       const filename = parts.pop();
-      let directory = root;
-      for (const part of parts) directory = await directory.getDirectoryHandle(part, {create: true});
+      let directory;
+      try {
+        directory = await getDirectory(root, parts, false);
+      } catch (error) {
+        if (error?.name !== "NotFoundError") throw error;
+        directory = null;
+      }
+      let exists = false;
+      if (directory) {
+        try {
+          await directory.getFileHandle(filename);
+          exists = true;
+        } catch (error) {
+          if (error?.name !== "NotFoundError") throw error;
+        }
+      }
+      plan.push({result, parts, filename, directory, exists});
+    }
+    const collisions = plan.filter((item) => item.exists);
+    let action = "overwrite";
+    if (collisions.length) {
+      action = await chooseCollisionAction(collisions.map((item) => item.result.name));
+      if (action === "cancel") return;
+    }
+    const usedByDirectory = new Map();
+    let overwritten = 0;
+    let renamed = 0;
+    for (const item of plan) {
+      const directory = item.directory || await getDirectory(root, item.parts, true);
+      let filename = item.filename;
+      const key = item.parts.join("/");
+      if (!usedByDirectory.has(key)) usedByDirectory.set(key, new Set());
+      const used = usedByDirectory.get(key);
+      if (action === "keep" && item.exists) {
+        while (true) {
+          try {
+            await directory.getFileHandle(filename);
+            filename = nextName(filename, used);
+          } catch (error) {
+            if (error?.name === "NotFoundError") break;
+            throw error;
+          }
+        }
+        renamed++;
+      } else if (item.exists) {
+        overwritten++;
+      }
+      used.add(filename);
       const handle = await directory.getFileHandle(filename, {create: true});
       const writable = await handle.createWritable();
-      await writable.write(result.bytes);
+      await writable.write(item.result.bytes);
       await writable.close();
     }
-    announce(`Saved ${results.length} result${results.length === 1 ? "" : "s"} to the selected folder.`, "success");
+    announce(`Saved ${results.length} result${results.length === 1 ? "" : "s"}: ${results.length} written, ${overwritten} overwritten, ${renamed} renamed.`, "success");
   } catch (error) {
     if (error?.name !== "AbortError") {
       announce(`Folder save failed: ${friendlyError(error)}. Use Download ZIP instead.`, "error");
