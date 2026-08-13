@@ -1236,6 +1236,27 @@ function renderPdfPages() {
       state.pdfOrder = ordered;
       renderPdfPages();
     };
+    page.onpointerdown = (event) => {
+      dragged = Number(page.dataset.index);
+      page.classList.add("dragging");
+      page.setPointerCapture?.(event.pointerId);
+    };
+    page.onpointerup = (event) => {
+      if (dragged === undefined) return;
+      const targetPage = document.elementFromPoint(event.clientX, event.clientY)?.closest(".pdf-page");
+      const target = targetPage ? Number(targetPage.dataset.index) : dragged;
+      page.classList.remove("dragging");
+      const ordered = [...files];
+      const [moved] = ordered.splice(dragged, 1);
+      ordered.splice(target, 0, moved);
+      dragged = undefined;
+      state.pdfOrder = ordered;
+      renderPdfPages();
+    };
+    page.onpointercancel = () => {
+      dragged = undefined;
+      page.classList.remove("dragging");
+    };
   });
 }
 function setupPlatformProfileControls() {

@@ -340,6 +340,21 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .app-shell .result-summary{border-left:3px solid var(--amber);color:var(--paper);font-size:12px;line-height:1.55;margin:0 0 var(--space-4);padding:var(--space-3) var(--space-4)}
 .app-shell .result-history-note{border-left:3px solid var(--amber);color:var(--paper-dim);font:11px var(--data-face);line-height:1.55;margin:0 0 var(--space-4);padding:var(--space-3) var(--space-4)}
 @media(max-width:600px){
+  .app-shell .tool-link,
+  .app-shell .text-button,
+  .app-shell .btn,
+  .app-shell .help,
+  .app-shell select,
+  .app-shell input:not([type="range"]):not([type="checkbox"]):not([type="color"]),
+  .landing .btn,
+  .landing-nav .help{
+    min-height:44px;
+  }
+  .app-shell .text-button{
+    padding:8px 6px;
+  }
+}
+@media(max-width:600px){
   .proof-compare-card{
     grid-template-columns:1fr
   }
@@ -349,6 +364,12 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
   .proof-compare-stage{border-width:1px}
   .proof-compare-panel figcaption{bottom:var(--space-2);left:var(--space-2);right:var(--space-2);text-align:left}
   .proof-compare-legend{display:none}
+}
+.pdf-page{touch-action:none}
+@media(max-width:600px){
+  .app-shell .recipe-toolbar .text-button{
+    min-height:44px;
+  }
 }
 @media(max-width:820px){.app-shell .sidebar nav{max-width:100%;width:100%}}
 
