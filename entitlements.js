@@ -26,7 +26,10 @@ function readLicense() {
 
 function activeTier() {
   const license = readLicense();
-  return license?.tier && TIERS[license.tier] ? license.tier : 'free';
+  return license?.tier && Object.prototype.hasOwnProperty.call(TIERS, license.tier) &&
+    TIERS[license.tier] && typeof TIERS[license.tier] === "object"
+    ? license.tier
+    : 'free';
 }
 
 function usedToday() {
@@ -64,7 +67,9 @@ export function getLicenseKey() {
 
 export function setLicenseState(value) {
   try {
-    if (value?.valid && TIERS[value.tier]) localStorage.setItem(LICENSE_STATE, JSON.stringify(value));
+    if (value?.valid && Object.prototype.hasOwnProperty.call(TIERS, value.tier) &&
+        TIERS[value.tier] && typeof TIERS[value.tier] === "object")
+      localStorage.setItem(LICENSE_STATE, JSON.stringify(value));
     else localStorage.removeItem(LICENSE_STATE);
   } catch {}
 }
@@ -109,7 +114,14 @@ export async function revalidateLicense() {
 }
 
 export function recordTask() {
-  const value = {date: today(), count: usedToday() + 1};
+  let count = usedToday() + 1;
+  try {
+    const latest = JSON.parse(localStorage.getItem(TASK_STATE) || 'null');
+    const latestCount = Number(latest?.count);
+    if (latest?.date === today() && Number.isInteger(latestCount) && latestCount >= 0)
+      count = latestCount + 1;
+  } catch {}
+  const value = {date: today(), count};
   try {
     localStorage.setItem(TASK_STATE, JSON.stringify(value));
   } catch {}

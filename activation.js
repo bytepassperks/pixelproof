@@ -30,7 +30,12 @@ form.onsubmit = async event => {
       signal: controller.signal,
     });
     clearTimeout(timer);
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error("Licence service returned an invalid response.");
+    }
     if (!response.ok || !data.valid) throw new Error(data.error || 'That licence key could not be validated.');
     setLicenseKey(key);
     setLicenseState(data);
@@ -41,7 +46,12 @@ form.onsubmit = async event => {
     clearTimeout(timer);
     setLicenseKey('');
     setLicenseState(null);
-    status.textContent = `${error.name === 'AbortError' ? 'Licence validation timed out.' : error.message} The free tier remains available.`;
+    const message = error.name === 'AbortError'
+      ? 'Licence validation timed out.'
+      : error instanceof TypeError
+        ? 'Licence service could not be reached.'
+        : error.message;
+    status.textContent = `${message} The free tier remains available.`;
     button.disabled = false;
   }
 };

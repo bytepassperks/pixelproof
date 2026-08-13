@@ -67,7 +67,7 @@ function readStorageBytes() {
 }
 
 async function recoveryBytes() {
-  if (!("indexedDB" in window)) return 0;
+  if (!window.indexedDB) return 0;
   return new Promise((resolve) => {
     const request = indexedDB.open(RECOVERY_DB);
     request.onerror = () => resolve(0);
@@ -122,24 +122,26 @@ export async function localDataSummary() {
 
 export async function clearLocalData(category) {
   if (category === "recovery" || category === "all") {
-    await new Promise((resolve) => {
-      const request = indexedDB.open(RECOVERY_DB);
-      request.onerror = () => resolve();
-      request.onsuccess = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains("outputs")) {
-          db.close();
-          resolve();
-          return;
-        }
-        const transaction = db.transaction("outputs", "readwrite");
-        transaction.objectStore("outputs").clear();
-        transaction.oncomplete = transaction.onerror = () => {
-          db.close();
-          resolve();
+    if (window.indexedDB) {
+      await new Promise((resolve) => {
+        const request = indexedDB.open(RECOVERY_DB);
+        request.onerror = () => resolve();
+        request.onsuccess = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains("outputs")) {
+            db.close();
+            resolve();
+            return;
+          }
+          const transaction = db.transaction("outputs", "readwrite");
+          transaction.objectStore("outputs").clear();
+          transaction.oncomplete = transaction.onerror = () => {
+            db.close();
+            resolve();
+          };
         };
-      };
-    });
+      });
+    }
   }
   if (category === "models" || category === "all") {
     if ("caches" in window) await caches.delete(MODEL_CACHE);

@@ -213,6 +213,7 @@ const SETTINGS_KEY = "pixelproof-tool-settings";
 const RECOVERY_DB = "pixelproof-recovery";
 const IOS_PIXEL_LIMIT = 24_000_000;
 let recoveryWrites = Promise.resolve();
+let recoveryWriteFailed = false;
 function readStoredJson(key, fallback) {
   try {
     const value = JSON.parse(localStorage.getItem(key) || "null");
@@ -223,11 +224,15 @@ function readStoredJson(key, fallback) {
 }
 function readStoredArray(key) {
   const value = readStoredJson(key, []);
-  return Array.isArray(value) ? value : [];
+  return Array.isArray(value)
+    ? value.filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
+    : [];
 }
 function readStoredObject(key) {
   const value = readStoredJson(key, {});
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? Object.assign(Object.create(null), value)
+    : Object.create(null);
 }
 function writeStoredJson(key, value) {
   try {
@@ -316,6 +321,10 @@ function isIOS() {
 }
 function recoveryStore(mode, value) {
   return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("Recovery storage is unavailable."));
+      return;
+    }
     const request = indexedDB.open(RECOVERY_DB);
     request.onupgradeneeded = () => request.result.createObjectStore("outputs", {keyPath: "id"});
     request.onerror = () => reject(request.error);
@@ -352,7 +361,9 @@ async function rememberOutput(result) {
         runId: result.runId || "",
         runStartedAt: result.runStartedAt || Date.now(),
       });
-    } catch {}
+    } catch {
+      recoveryWriteFailed = true;
+    }
   });
   return recoveryWrites;
 }
@@ -368,10 +379,23 @@ async function restoreRecovery() {
       Date.now() - item.savedAt < 24 * 60 * 60 * 1000,
     );
     if (!recent.length) return;
-    const latestRun = recent.reduce((latest, item) =>
-      !latest || item.runStartedAt > latest ? item.runStartedAt : latest, 0);
-    const recovered = recent.filter((item) => item.runStartedAt === latestRun);
-    state.results = recovered.map((item) => ({...item, bytes: item.bytes}));
+    const runLabels = new Map();
+    recent.forEach((item) => {
+      const timestamp = Number(item.runStartedAt);
+      const label = Number.isFinite(timestamp)
+        ? new Date(timestamp).toLocaleString()
+        : "unknown run";
+      runLabels.set(timestamp, label);
+    });
+    const recovered = recent
+      .sort((a, b) => (a.runStartedAt || 0) - (b.runStartedAt || 0))
+      .map((item) => ({
+        ...item,
+        bytes: item.bytes,
+        recoveryRunLabel: `Recovered run · ${runLabels.get(Number(item.runStartedAt)) || "unknown run"}`,
+      }));
+    state.results = recovered;
+    state.resultNotice = `Recovered ${recovered.length} output${recovered.length === 1 ? "" : "s"} from ${runLabels.size} interrupted run${runLabels.size === 1 ? "" : "s"}.`;
     $("#results").hidden = false;
     renderResults();
     const recoveryMessage = `${recovered.length} completed output${recovered.length === 1 ? "" : "s"} recovered from your last interrupted job.`;
@@ -383,7 +407,16 @@ async function restoreRecovery() {
   } catch {}
 }
 function allRecipes() {
-  return [...recipes, ...readStoredArray(RECIPE_KEY)];
+  return [...recipes, ...readStoredArray(RECIPE_KEY)].filter((recipe) =>
+    typeof recipe.id === "string" &&
+    typeof recipe.name === "string" &&
+    Array.isArray(recipe.steps) &&
+    recipe.steps.length > 0 &&
+    recipe.steps.every((step) =>
+      step && typeof step.tool === "string" && typeof step.label === "string" &&
+      step.operation && typeof step.operation === "object" && !Array.isArray(step.operation),
+    ),
+  );
 }
 function initRecipes() {
   const select = $("#recipe-select");
@@ -620,7 +653,7 @@ $("#file-input").onchange = (e) => {
 };
 $("#folder-input").onchange = (e) => addFiles(e.target.files);
 async function consumeSharedFiles() {
-  if (!("indexedDB" in window)) return;
+  if (!window.indexedDB) return;
   try {
     const db = await new Promise((resolve, reject) => {
       const request = indexedDB.open(RECOVERY_DB, 2);
@@ -692,6 +725,10 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("offline", () => announce("You are offline. Local image processing can continue; model downloads and app updates cannot.", "error"));
 window.addEventListener("online", () => announce("Connection restored. Local processing remains in this tab.", "success"));
+window.addEventListener("storage", (event) => {
+  if (event.key === "pixelproof-task-state" || event.key === "pixelproof-license-state")
+    window.dispatchEvent(new Event("entitlementchange"));
+});
 $("#reset-tool").onclick = () => {
   const all = savedSettings();
   delete all[state.tool];
@@ -1758,7 +1795,43 @@ async function processOne(file, op) {
 }
 function outputExtension(mime) {
   if (mime === "image/x-icon") return "ico";
+  if (mime === "image/avif") return "avif";
   return Object.values(MIME).find((x) => x.mime === mime)?.ext || "png";
+}
+function validateOperation(operation) {
+  const positive = (value, label) =>
+    Number.isFinite(value) && value > 0 ? "" : `${label} must be a positive number.`;
+  if (["resize", "social", "web-export"].includes(operation.type))
+    return positive(operation.width, "Width") || positive(operation.height, "Height");
+  if (operation.type === "crop") {
+    if (![operation.x, operation.y, operation.width, operation.height].every(Number.isFinite))
+      return "Crop coordinates and dimensions must be numbers.";
+    if (operation.x < 0 || operation.y < 0 || operation.width <= 0 || operation.height <= 0)
+      return "Crop coordinates cannot be negative and width/height must be greater than zero.";
+  }
+  if (["compress", "convert"].includes(operation.type) &&
+      (!Number.isFinite(operation.quality) || operation.quality < 0.1 || operation.quality > 1))
+    return "Quality must be between 10 and 100.";
+  if (operation.type === "target-size" &&
+      (!Number.isFinite(operation.targetBytes) || operation.targetBytes < 1000))
+    return "Target size must be at least 1000 bytes.";
+  if (operation.type === "transform" &&
+      (!Number.isFinite(operation.degrees) || operation.degrees % 90 !== 0))
+    return "Rotation must be a multiple of 90 degrees.";
+  if (operation.type === "watermark") {
+    if (typeof operation.text !== "string" || operation.text.length > 5000)
+      return "Watermark text must be 5000 characters or fewer.";
+    if (!Number.isFinite(operation.opacity) || operation.opacity < 1 || operation.opacity > 100 ||
+        !Number.isFinite(operation.scale) || operation.scale < 1 || operation.scale > 100)
+      return "Watermark opacity and scale must be between 1 and 100.";
+  }
+  if (operation.type === "pdf" &&
+      (!Number.isFinite(operation.margin) || operation.margin < 0 || operation.margin > 50))
+    return "PDF margins must be between 0 and 50 mm.";
+  if (operation.type === "id-sheet" &&
+      (!Number.isInteger(operation.copies) || operation.copies < 1 || operation.copies > 1000))
+    return "Copies must be a whole number between 1 and 1000.";
+  return "";
 }
 async function preflight(files, isSample = false) {
   const foundAnimations = await inspectAnimations(files);
@@ -1786,6 +1859,18 @@ async function preflight(files, isSample = false) {
     } catch {}
   }
   if (oversized.length) return `These files exceed the browser pixel limit before processing: ${oversized.join(", ")}. Resize them first or remove them from the batch.`;
+  if (state.tool === "crop") {
+    const crop = await options();
+    const outside = files.find((file) => {
+      const dimensions = originalStats.get(file);
+      return dimensions && (
+        crop.x + crop.width > dimensions.width ||
+        crop.y + crop.height > dimensions.height
+      );
+    });
+    if (outside)
+      return `Crop rectangle must fit inside ${outside.name} (${originalStats.get(outside).width}×${originalStats.get(outside).height}).`;
+  }
   if (isIOS()) {
     const iosOversized = files.filter((file) => {
       const stats = originalStats.get(file);
@@ -1846,6 +1931,13 @@ async function run(runFiles = state.files, isSample = false) {
   const base = await options(),
     op = { ...base, maxPixels: PRODUCT.maxPixels },
     outputs = [], usedNames = new Map();
+  const invalidOperation = validateOperation(base);
+  if (invalidOperation) {
+    $("#run-status").textContent = invalidOperation;
+    setRunBusy(false);
+    state.running = false;
+    return;
+  }
   let done = 0;
   const tasks = [];
   for (const file of runFiles) {
@@ -1941,6 +2033,8 @@ async function run(runFiles = state.files, isSample = false) {
     : failed
       ? `Finished with ${failed} error${failed === 1 ? "" : "s"}: ${succeeded} succeeded. Failed files remain below; retry them individually.`
       : `Finished ${done} output${done === 1 ? "" : "s"}.`;
+  if (recoveryWriteFailed)
+    $("#run-status").textContent += " Recovery storage is unavailable; download these outputs before leaving.";
   state.cancel = false;
 }
 function formatBytes(bytes) {
@@ -1964,6 +2058,8 @@ function resultSummary(outputs) {
 async function runPdfWorkspace(runFiles) {
   const message = await preflight(runFiles);
   if (message) { $("#run-status").textContent = message; return; }
+  const invalidOperation = validateOperation(await options());
+  if (invalidOperation) { $("#run-status").textContent = invalidOperation; return; }
   const button = $("#run-button");
   state.running = true;
   state.activeRunId = crypto.randomUUID();
@@ -2013,6 +2109,9 @@ async function runIdPrintSheet(runFiles) {
   if (message) { $("#run-status").textContent = message; return; }
   const file = runFiles[0];
   if (!file) return;
+  const requestedCopies = Number($("#idCopies").value || 1);
+  const invalidOperation = validateOperation({type: "id-sheet", copies: requestedCopies});
+  if (invalidOperation) { $("#run-status").textContent = invalidOperation; return; }
   const profiles = {us: [51, 51], ca: [50, 70], uk: [35, 45]};
   const papers = {"4x6": [152.4, 101.6], a4: [210, 297]};
   state.running = true;
@@ -2022,7 +2121,6 @@ async function runIdPrintSheet(runFiles) {
   try {
     const [photoW, photoH] = profiles[$("#idProfile").value], [paperW, paperH] = papers[$("#idPaper").value];
     setProgress(0, 1);
-    const requestedCopies = Number($("#idCopies").value || 1);
     const image = await imageForPdf(file, undefined, photoW / photoH);
     const margin = 5, gutter = 2;
     const bytes = await generateIdSheet(image, photoW, photoH, paperW, paperH, requestedCopies, margin, gutter);
@@ -2224,7 +2322,7 @@ function renderResults() {
       const dimensionNote = hasDimensions
         ? ` · ${r.width}×${r.height}${dimensionsChanged ? ` · was ${r.originalStats.width}×${r.originalStats.height}` : ""}`
         : "";
-      row.innerHTML = `<figure class="result-print"><img class="result-thumb" src="${url}" alt=""><figcaption><strong>${escapeHtml(r.name)}</strong><span>${escapeHtml(r.mime)}${byteNote}${dimensionNote}${quality}${budget}</span></figcaption></figure><a class="btn result-download" draggable="true" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
+      row.innerHTML = `<figure class="result-print"><img class="result-thumb" src="${url}" alt=""><figcaption><strong>${escapeHtml(r.name)}</strong><span>${escapeHtml(r.mime)}${byteNote}${dimensionNote}${quality}${budget}${r.recoveryRunLabel ? ` · ${escapeHtml(r.recoveryRunLabel)}` : ""}</span></figcaption></figure><a class="btn result-download" draggable="true" href="${url}" download="${escapeHtml(r.name)}">Download</a>`;
       const download = row.querySelector("a[download]");
       download.addEventListener("dragstart", (event) => {
         event.dataTransfer?.setData(
