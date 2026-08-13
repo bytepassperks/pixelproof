@@ -790,7 +790,10 @@ function previousResultNotice() {
   const tool = toolDefs.find((item) => item.id === state.resultToolId);
   const label = tool?.label || state.resultToolLabel || "Previous tool";
   const count = state.results.filter((result) => result.bytes).length;
-  return `Previous run · ${label} · ${count} completed output${count === 1 ? "" : "s"} remains below. These outputs are not part of the next run.`;
+  const noun = count === 1 ? "completed output" : "completed outputs";
+  const pronoun = count === 1 ? "It" : "They";
+  const verb = count === 1 ? "remains" : "remain";
+  return `Previous ${label} run · ${count} ${noun} ${verb} below. ${pronoun} ${count === 1 ? "is" : "are"} not part of the next run.`;
 }
 function setRunBusy(busy) {
   const current = toolDefs.find((tool) => tool.id === state.tool);
