@@ -9,7 +9,7 @@ import {
   revalidateLicense,
 } from "./entitlements.js";
 import { mountBackgroundTool } from "./background-removal.js";
-import { inspectMetadata } from "./metadata.js";
+import { inspectColorInfo, inspectMetadata } from "./metadata.js";
 import { decodeHeic, isHeic } from "./heic.js";
 import { generatePdf, imageForPdf, pdfPageSize } from "./pdf.js";
 import {
@@ -831,6 +831,7 @@ function addFiles(list, isSample = false, append = false) {
     state.animationFiles = [...new Set([...state.animationFiles, ...found])];
     renderAnimationWarning();
   });
+  inspectColorInfo(incoming[0]).then(() => renderColorWarning(incoming));
   const oversized = state.files.find((f) => f.size > PRODUCT.maxPixels * 4);
   $("#file-summary").hidden = false;
   const entitlement = getEntitlementState();
@@ -838,7 +839,7 @@ function addFiles(list, isSample = false, append = false) {
     ? "unlimited jobs"
     : `${Math.max(0, entitlement.tasksPerDay - entitlement.tasksUsed)} jobs left today`;
   $("#file-summary").innerHTML =
-    `<span>${state.sample ? "Bundled sample · " : ""}${state.files.length} image${state.files.length === 1 ? "" : "s"} selected for the next run.</span><span>${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}</span><div class="file-summary-actions"><button class="text-button add-selection" type="button">Add files</button><button class="text-button clear-selection" type="button">Clear selection</button></div><div id="animation-warning"></div>`;
+    `<span>${state.sample ? "Bundled sample · " : ""}${state.files.length} image${state.files.length === 1 ? "" : "s"} selected for the next run.</span><span>${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}</span><div class="file-summary-actions"><button class="text-button add-selection" type="button">Add files</button><button class="text-button clear-selection" type="button">Clear selection</button></div><div id="animation-warning"></div><div id="color-warning"></div>`;
   $(".add-selection")?.addEventListener("click", () => {
     state.appendSelection = true;
     $("#file-input").click();
@@ -986,6 +987,24 @@ function renderAnimationWarning() {
   const output = $("#animation-warning");
   if (!output || !state.animationFiles.length) return;
   output.innerHTML = `<div class="warning-callout"><strong>Animated input detected:</strong> ${state.animationFiles.map(escapeHtml).join(", ")}. Only the first frame will be processed; animation will not be preserved. <label class="check"><input id="allow-animation" type="checkbox"> I understand</label></div>`;
+}
+async function renderColorWarning(files = state.files) {
+  const output = $("#color-warning");
+  if (!output) return;
+  const infos = await Promise.all(files.map((file) => inspectColorInfo(file)));
+  const profile = files.filter((file, index) => infos[index].embeddedProfile).map((file) => file.name);
+  const highDepth = files
+    .map((file, index) => ({file, info: infos[index]}))
+    .filter(({info}) => info.bitDepth > 8)
+    .map(({file, info}) => `${file.name} (${info.bitDepth}-bit)`);
+  if (!profile.length && !highDepth.length) {
+    output.innerHTML = "";
+    return;
+  }
+  const details = [];
+  if (profile.length) details.push(`embedded colour profiles may be converted to the browser's working colour space and are not carried into exports: ${profile.join(", ")}`);
+  if (highDepth.length) details.push(`higher-than-8-bit input is reduced to 8-bit canvas output: ${highDepth.join(", ")}`);
+  output.innerHTML = `<div class="warning-callout"><strong>Colour handling:</strong> ${details.join(" ")}</div>`;
 }
 function savedSettings() {
   return readStoredObject(SETTINGS_KEY);

@@ -139,6 +139,31 @@ export async function inspectMetadata(file) {
   return result;
 }
 
+export async function inspectColorInfo(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const info = {bitDepth: 8, embeddedProfile: false};
+  if (bytes[0] === 0x89 && readAscii(bytes, 1, 3) === "PNG" && bytes.length >= 26) {
+    info.bitDepth = bytes[24];
+    for (let offset = 8; offset + 12 <= bytes.length; ) {
+      const length = new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0);
+      const type = readAscii(bytes, offset + 4, 4);
+      if (type === "iCCP") info.embeddedProfile = true;
+      offset += 12 + length;
+      if (type === "IEND") break;
+    }
+  } else if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+    for (let offset = 2; offset + 4 <= bytes.length && bytes[offset] === 0xff; ) {
+      const marker = bytes[offset + 1];
+      if (marker === 0xda || marker === 0xd9) break;
+      const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+      if (length < 2 || offset + 2 + length > bytes.length) break;
+      if (marker === 0xe2 && readAscii(bytes, offset + 4, 11) === "ICC_PROFILE") info.embeddedProfile = true;
+      offset += 2 + length;
+    }
+  }
+  return info;
+}
+
 function putAscii(bytes, offset, value) {
   bytes.set(textEncoder.encode(`${value}\0`), offset);
 }
