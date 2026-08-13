@@ -13,6 +13,7 @@ function fitWithin(width, height, maxWidth, maxHeight) {
 function targetSize(width, height, op) {
   if (op.mode === 'percentage') return {width: Math.max(1, Math.round(width * op.value / 100)), height: Math.max(1, Math.round(height * op.value / 100))};
   if (op.mode === 'fit') return fitWithin(width, height, op.width, op.height);
+  if (op.mode === 'contain') return {width: Math.max(1, Math.round(op.width || width)), height: Math.max(1, Math.round(op.height || height))};
   return {width: Math.max(1, Math.round(op.width || width)), height: Math.max(1, Math.round(op.height || height))};
 }
 function drawCover(ctx, source, width, height, anchor = 'center') {
@@ -359,7 +360,7 @@ self.onmessage = async ({data}) => {
       watermark(out, operation, width, height);
     } else if (operation.type === 'resize' || operation.type === 'web-export' || operation.type === 'social' || operation.type === 'icon-set' || operation.type === 'target-size') {
       if (operation.mime === 'image/jpeg') { out.fillStyle = '#fff'; out.fillRect(0, 0, width, height); }
-      if (operation.fill || operation.type === 'web-export' || (operation.type === 'resize' && operation.mode !== 'fit')) drawCover(out, image, width, height);
+      if (operation.fill || operation.type === 'web-export' || (operation.type === 'resize' && !['fit', 'contain'].includes(operation.mode))) drawCover(out, image, width, height);
       else drawContain(out, image, width, height);
     } else if (operation.type === 'photo-editor') {
       out.drawImage(image, 0, 0);

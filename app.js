@@ -198,6 +198,7 @@ const state = {
   pdfOrder: [],
   animationFiles: [],
   sample: false,
+  appendSelection: false,
 };
 const supportedFormats = new Set();
 const originalStats = new WeakMap();
@@ -557,8 +558,14 @@ document.querySelectorAll("[data-clear-local]").forEach((button) => {
   };
 });
 renderPrivacySelfTest();
-$("#choose-files").onclick = () => $("#file-input").click();
-$("#choose-folder").onclick = () => $("#folder-input").click();
+$("#choose-files").onclick = () => {
+  state.appendSelection = false;
+  $("#file-input").click();
+};
+$("#choose-folder").onclick = () => {
+  state.appendSelection = false;
+  $("#folder-input").click();
+};
 $("#sample-run").onclick = async () => {
   const button = $("#sample-run");
   button.disabled = true;
@@ -580,7 +587,11 @@ $("#sample-run").onclick = async () => {
     button.textContent = "See it work with a sample";
   }
 };
-$("#file-input").onchange = (e) => addFiles(e.target.files);
+$("#file-input").onchange = (e) => {
+  const append = state.appendSelection;
+  state.appendSelection = false;
+  addFiles(e.target.files, false, append);
+};
 $("#folder-input").onchange = (e) => addFiles(e.target.files);
 async function consumeSharedFiles() {
   if (!("indexedDB" in window)) return;
@@ -692,7 +703,11 @@ document
   $("#tool-description").textContent = tool.description;
   renderControls();
 }
-function addFiles(list, isSample = false) {
+function addFiles(list, isSample = false, append = false) {
+  if (state.running) {
+    $("#run-status").textContent = "A job is running. Cancel it before changing the selection.";
+    return;
+  }
   const incoming = [...list].filter((f) =>
     /^image\/(jpeg|png|webp|bmp|gif|svg\+xml|apng)$/.test(f.type) ||
     /^(image\/(x-icon|vnd\.microsoft\.icon))$/.test(f.type) ||
@@ -709,6 +724,15 @@ function addFiles(list, isSample = false) {
     state.pdfOrder = [];
   }
   if (!isSample) state.sample = false;
+  if (!append) {
+    revokeResultUrls();
+    state.files = [];
+    state.animationFiles = [];
+    state.pdfOrder = [];
+    state.results = [];
+    $("#result-list").innerHTML = "";
+    $("#result-summary").textContent = "";
+  }
   state.files = [...state.files, ...incoming];
   state.pdfOrder = state.files;
   inspectAnimations(incoming).then((found) => {
@@ -722,14 +746,24 @@ function addFiles(list, isSample = false) {
     ? "unlimited jobs"
     : `${Math.max(0, entitlement.tasksPerDay - entitlement.tasksUsed)} jobs left today`;
   $("#file-summary").innerHTML =
-    `<span>${state.sample ? "Bundled sample · " : ""}${state.files.length} image${state.files.length === 1 ? "" : "s"} ready</span><span>${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}${state.sample ? ' · <button class="text-button clear-sample" type="button">Clear sample</button>' : ""}</span><div id="animation-warning"></div>`;
+    `<span>${state.sample ? "Bundled sample · " : ""}${state.files.length} image${state.files.length === 1 ? "" : "s"} selected for the next run.</span><span>${oversized ? "Large files will be checked before processing." : "Image bytes stay in this browser."} · ${entitlement.label} · ${jobLimit}</span><div class="file-summary-actions"><button class="text-button add-selection" type="button">Add files</button><button class="text-button clear-selection" type="button">Clear selection</button></div><div id="animation-warning"></div>`;
+  $(".add-selection")?.addEventListener("click", () => {
+    state.appendSelection = true;
+    $("#file-input").click();
+  });
+  $(".clear-selection")?.addEventListener("click", clearFiles);
   $(".clear-sample")?.addEventListener("click", clearFiles);
   $("#controls").hidden = false;
   renderControls();
 }
 function clearFiles() {
+  if (state.running) {
+    $("#run-status").textContent = "A job is running. Cancel it before clearing the selection.";
+    return;
+  }
   revokeResultUrls();
   state.files = [];
+  state.appendSelection = false;
   state.sample = false;
   state.animationFiles = [];
   state.pdfOrder = [];
@@ -1444,7 +1478,7 @@ async function options() {
     const metadata = await inspectMetadata(state.files[0]);
     return {type: "metadata", mime: "image/jpeg", quality: 0.92, metadata: {mode: $("#metadataMode").value, ...metadata.fields}};
   }
-  if (id === "platform-profiles") return {type: "resize", mode: $("#platformMode").value === "fill" ? "fill" : "dimensions", width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mime: $("#platformMime").value};
+  if (id === "platform-profiles") return {type: "resize", mode: $("#platformMode").value === "fill" ? "fill" : "contain", width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mime: $("#platformMime").value};
   if (id === "image-to-pdf") return {type: "pdf", pageSize: $("#pdfSize").value, orientation: $("#pdfOrientation").value, mode: $("#pdfMode").value, margin: Number($("#pdfMargin").value || 0)};
   if (id === "id-print-sheet") return {type: "id-sheet", profile: $("#idProfile").value, paper: $("#idPaper").value, copies: Number($("#idCopies").value || 1)};
   if (id === "svg-raster") return {type: "resize", mode: "exact", width: Number($("#svgWidth").value), height: Number($("#svgHeight").value), mime: "image/png"};
