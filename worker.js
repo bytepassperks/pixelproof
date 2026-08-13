@@ -10,6 +10,108 @@ function fitWithin(width, height, maxWidth, maxHeight) {
   const scale = Math.min(maxWidth / width, maxHeight / height, 1);
   return {width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale))};
 }
+function lanczosWeight(value, radius = 3) {
+  const distance = Math.abs(value);
+  if (distance >= radius) return 0;
+  if (distance < 0.00001) return 1;
+  const piDistance = Math.PI * distance;
+  return radius * Math.sin(piDistance) * Math.sin(piDistance / radius) / (piDistance * piDistance);
+}
+function drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
+  const sourceWidth = Math.max(1, Math.ceil(sw)), sourceHeight = Math.max(1, Math.ceil(sh));
+  const targetWidth = Math.max(1, Math.round(dw)), targetHeight = Math.max(1, Math.round(dh));
+  const sourceCanvas = new OffscreenCanvas(sourceWidth, sourceHeight);
+  const sourceContext = sourceCanvas.getContext("2d");
+  sourceContext.imageSmoothingEnabled = false;
+  sourceContext.drawImage(source, sx, sy, sw, sh, 0, 0, sourceWidth, sourceHeight);
+  const input = sourceContext.getImageData(0, 0, sourceWidth, sourceHeight).data;
+  const horizontal = new Float32Array(targetWidth * sourceHeight * 4);
+  const horizontalWeights = [];
+  const horizontalScale = sourceWidth / targetWidth;
+  for (let x = 0; x < targetWidth; x += 1) {
+    const center = (x + 0.5) * sourceWidth / targetWidth - 0.5;
+    const radius = 3 * horizontalScale;
+    const first = Math.floor(center - radius + 1);
+    const weights = [];
+    let total = 0;
+    for (let tap = 0; tap <= radius * 2; tap += 1) {
+      const sourceX = Math.min(sourceWidth - 1, Math.max(0, first + tap));
+      const weight = lanczosWeight((center - (first + tap)) / horizontalScale);
+      weights.push([sourceX, weight]);
+      total += weight;
+    }
+    horizontalWeights.push(weights.map(([sourceX, weight]) => [sourceX, weight / total]));
+  }
+  for (let y = 0; y < sourceHeight; y += 1) {
+    for (let x = 0; x < targetWidth; x += 1) {
+      const output = (y * targetWidth + x) * 4;
+      for (const [sourceX, weight] of horizontalWeights[x]) {
+        const inputOffset = (y * sourceWidth + sourceX) * 4;
+        horizontal[output] += input[inputOffset] * weight;
+        horizontal[output + 1] += input[inputOffset + 1] * weight;
+        horizontal[output + 2] += input[inputOffset + 2] * weight;
+        horizontal[output + 3] += input[inputOffset + 3] * weight;
+      }
+    }
+  }
+  const outputValues = new Float32Array(targetWidth * targetHeight * 4);
+  const verticalScale = sourceHeight / targetHeight;
+  for (let y = 0; y < targetHeight; y += 1) {
+    const center = (y + 0.5) * sourceHeight / targetHeight - 0.5;
+    const radius = 3 * verticalScale;
+    const first = Math.floor(center - radius + 1);
+    const weights = [];
+    let total = 0;
+    for (let tap = 0; tap <= radius * 2; tap += 1) {
+      const sourceY = Math.min(sourceHeight - 1, Math.max(0, first + tap));
+      const weight = lanczosWeight((center - (first + tap)) / verticalScale);
+      weights.push([sourceY, weight]);
+      total += weight;
+    }
+    for (let x = 0; x < targetWidth; x += 1) {
+      const outputOffset = (y * targetWidth + x) * 4;
+      for (const [sourceY, weight] of weights) {
+        const inputOffset = (sourceY * targetWidth + x) * 4;
+        outputValues[outputOffset] += horizontal[inputOffset] * weight / total;
+        outputValues[outputOffset + 1] += horizontal[inputOffset + 1] * weight / total;
+        outputValues[outputOffset + 2] += horizontal[inputOffset + 2] * weight / total;
+        outputValues[outputOffset + 3] += horizontal[inputOffset + 3] * weight / total;
+      }
+    }
+  }
+  const output = new Uint8ClampedArray(outputValues);
+  const targetCanvas = new OffscreenCanvas(targetWidth, targetHeight);
+  targetCanvas.getContext("2d").putImageData(new ImageData(output, targetWidth, targetHeight), 0, 0);
+  ctx.drawImage(targetCanvas, dx, dy, dw, dh);
+}
+function drawResampled(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh) {
+  if (Math.max(sw / Math.max(1, dw), sh / Math.max(1, dh)) > 2 && sw * sh <= 16_000_000) {
+    drawLanczos(ctx, source, sx, sy, sw, sh, dx, dy, dw, dh);
+    return;
+  }
+  if (Math.max(sw / Math.max(1, dw), sh / Math.max(1, dh)) <= 2) {
+    ctx.drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh);
+    return;
+  }
+  let currentWidth = Math.max(1, Math.ceil(sw));
+  let currentHeight = Math.max(1, Math.ceil(sh));
+  let current = new OffscreenCanvas(currentWidth, currentHeight);
+  const initialContext = current.getContext("2d");
+  initialContext.imageSmoothingQuality = "high";
+  initialContext.drawImage(source, sx, sy, sw, sh, 0, 0, currentWidth, currentHeight);
+  while (Math.max(currentWidth / Math.max(1, dw), currentHeight / Math.max(1, dh)) > 2) {
+    const nextWidth = Math.max(Math.ceil(dw), Math.floor(currentWidth / 2));
+    const nextHeight = Math.max(Math.ceil(dh), Math.floor(currentHeight / 2));
+    const next = new OffscreenCanvas(nextWidth, nextHeight);
+    const nextContext = next.getContext("2d");
+    nextContext.imageSmoothingQuality = "high";
+    nextContext.drawImage(current, 0, 0, currentWidth, currentHeight, 0, 0, nextWidth, nextHeight);
+    current = next;
+    currentWidth = nextWidth;
+    currentHeight = nextHeight;
+  }
+  ctx.drawImage(current, 0, 0, currentWidth, currentHeight, dx, dy, dw, dh);
+}
 function targetSize(width, height, op) {
   if (op.mode === 'percentage') return {width: Math.max(1, Math.round(width * op.value / 100)), height: Math.max(1, Math.round(height * op.value / 100))};
   if (op.mode === 'fit') return fitWithin(width, height, op.width, op.height);
@@ -21,12 +123,12 @@ function drawCover(ctx, source, width, height, anchor = 'center') {
   const sw = source.width * scale, sh = source.height * scale;
   const x = anchor === 'left' ? 0 : anchor === 'right' ? width - sw : (width - sw) / 2;
   const y = anchor === 'top' ? 0 : anchor === 'bottom' ? height - sh : (height - sh) / 2;
-  ctx.drawImage(source, x, y, sw, sh);
+  drawResampled(ctx, source, 0, 0, source.width, source.height, x, y, sw, sh);
 }
 function drawContain(ctx, source, width, height) {
   const scale = Math.min(width / source.width, height / source.height);
   const sw = source.width * scale, sh = source.height * scale;
-  ctx.drawImage(source, (width - sw) / 2, (height - sh) / 2, sw, sh);
+  drawResampled(ctx, source, 0, 0, source.width, source.height, (width - sw) / 2, (height - sh) / 2, sw, sh);
 }
 async function decode(buffer, type) { return createImageBitmap(new Blob([buffer], {type})); }
 async function encode(canvas, mime, quality) {
@@ -341,7 +443,7 @@ self.onmessage = async ({data}) => {
     canvas = new OffscreenCanvas(width, height); const out = canvas.getContext('2d', {alpha: true});
     out.imageSmoothingQuality = 'high';
     if (operation.type === 'crop') {
-      out.drawImage(image, operation.x, operation.y, operation.width, operation.height, 0, 0, width, height);
+      drawResampled(out, image, operation.x, operation.y, operation.width, operation.height, 0, 0, width, height);
     } else if (operation.type === 'rotate') {
       out.translate(width / 2, height / 2); out.rotate(operation.degrees * Math.PI / 180);
       out.scale(operation.flipX ? -1 : 1, operation.flipY ? -1 : 1);
@@ -413,7 +515,7 @@ self.onmessage = async ({data}) => {
               resizedContext.fillStyle = "#fff";
               resizedContext.fillRect(0, 0, resized.width, resized.height);
             }
-            resizedContext.drawImage(canvas, 0, 0, resized.width, resized.height);
+            drawResampled(resizedContext, canvas, 0, 0, canvas.width, canvas.height, 0, 0, resized.width, resized.height);
             low = 0.05; high = 1;
             for (let attempt = 0; attempt < 12; attempt++) {
               const quality = (low + high) / 2;
