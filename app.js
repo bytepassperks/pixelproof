@@ -199,6 +199,9 @@ const state = {
   animationFiles: [],
   sample: false,
   appendSelection: false,
+  resultNotice: "",
+  resultToolId: "",
+  resultToolLabel: "",
 };
 const supportedFormats = new Set();
 const originalStats = new WeakMap();
@@ -682,12 +685,13 @@ function selectTool(id) {
     $("#run-button").focus();
     return;
   }
-  revokeResultUrls();
+  if (state.results.length) {
+    state.resultNotice = previousResultNotice();
+    renderResults();
+  }
   state.tool = id;
-  state.results = [];
   $("#run-status").textContent = "";
   $("#results").hidden = false;
-  $("#result-list").innerHTML = "";
   setProgress(0, 0);
 document
   .querySelectorAll(".tool-link")
@@ -725,13 +729,13 @@ function addFiles(list, isSample = false, append = false) {
   }
   if (!isSample) state.sample = false;
   if (!append) {
-    revokeResultUrls();
+    if (state.results.length) {
+      state.resultNotice = previousResultNotice();
+      renderResults();
+    }
     state.files = [];
     state.animationFiles = [];
     state.pdfOrder = [];
-    state.results = [];
-    $("#result-list").innerHTML = "";
-    $("#result-summary").textContent = "";
   }
   state.files = [...state.files, ...incoming];
   state.pdfOrder = state.files;
@@ -761,26 +765,32 @@ function clearFiles() {
     $("#run-status").textContent = "A job is running. Cancel it before clearing the selection.";
     return;
   }
-  revokeResultUrls();
+  if (state.results.length) {
+    state.resultNotice = previousResultNotice();
+    renderResults();
+  }
   state.files = [];
   state.appendSelection = false;
   state.sample = false;
   state.animationFiles = [];
   state.pdfOrder = [];
-  state.results = [];
   $("#file-input").value = "";
   $("#folder-input").value = "";
   $("#file-summary").hidden = true;
   $("#controls").hidden = true;
   $("#results").hidden = false;
-  $("#result-list").innerHTML = "";
-  $("#result-summary").textContent = "";
   setProgress(0, 0);
   $("#run-status").textContent = "";
 }
 function revokeResultUrls() {
   state.urls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   state.compareUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
+}
+function previousResultNotice() {
+  const tool = toolDefs.find((item) => item.id === state.resultToolId);
+  const label = tool?.label || state.resultToolLabel || "Previous tool";
+  const count = state.results.filter((result) => result.bytes).length;
+  return `Previous run · ${label} · ${count} completed output${count === 1 ? "" : "s"} remains below. These outputs are not part of the next run.`;
 }
 function setRunBusy(busy) {
   const current = toolDefs.find((tool) => tool.id === state.tool);
@@ -1755,7 +1765,9 @@ async function run(runFiles = state.files, isSample = false) {
   state.activeRunId = crypto.randomUUID();
   state.activeRunStartedAt = Date.now();
   setRunBusy(true);
+  revokeResultUrls();
   state.results = [];
+  state.resultNotice = "";
   $("#results").hidden = false;
   $("#result-list").innerHTML = "";
   $("#download-zip").hidden = true;
@@ -1981,7 +1993,9 @@ async function runRecipe() {
   state.running = true;
   state.activeRunId = crypto.randomUUID();
   setRunBusy(true);
+  revokeResultUrls();
   state.results = [];
+  state.resultNotice = "";
   $("#results").hidden = false;
   $("#result-list").innerHTML = "";
   $("#download-zip").hidden = true;
@@ -2077,6 +2091,16 @@ function renderResults() {
   const list = $("#result-list");
   state.urls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   list.innerHTML = "";
+  if (!state.resultNotice || !state.resultToolId) {
+    state.resultToolId = state.tool;
+    state.resultToolLabel = toolDefs.find((item) => item.id === state.tool)?.label || state.tool;
+  }
+  if (state.resultNotice) {
+    const notice = document.createElement("p");
+    notice.className = "result-history-note";
+    notice.textContent = state.resultNotice;
+    list.append(notice);
+  }
   const good = state.results.filter((r) => r.bytes);
   for (const r of state.results) {
     const row = document.createElement("article");
