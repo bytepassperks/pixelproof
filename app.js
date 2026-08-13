@@ -2492,6 +2492,7 @@ function renderResults() {
   }
   if (good.length) {
     $("#download-zip").hidden = false;
+    $("#folder-save-note").hidden = "showDirectoryPicker" in window;
     $("#download-zip").onclick = async () => {
       try {
         const total = good.reduce((sum, result) => sum + result.bytes.byteLength, 0);
