@@ -2290,7 +2290,9 @@ async function runRecipe() {
   $("#save-folder").hidden = true;
   const outputs = [], usedNames = new Map();
   let completed = 0;
-  setProgress(0, files.length);
+  const stepCount = Math.max(1, state.recipe.steps.length);
+  const totalWork = files.length * stepCount;
+  setProgress(0, totalWork);
   const returnFocus = document.activeElement === button;
   try {
     for (const file of files) {
@@ -2312,10 +2314,14 @@ async function runRecipe() {
         }
       } else {
         let input = file, result;
-        for (const step of state.recipe.steps) {
+        for (let stepIndex = 0; stepIndex < state.recipe.steps.length; stepIndex += 1) {
+          const step = state.recipe.steps[stepIndex];
           $("#recipe-status").textContent = `Processing file ${completed + 1} of ${files.length}: ${step.label} · ${completed} finished · ${files.length - completed - 1} remaining`;
-          result = await processOne(input, {...step.operation, maxPixels: PRODUCT.maxPixels});
+          result = await processOne(input, {...step.operation, maxPixels: PRODUCT.maxPixels}, (progress) =>
+            setProgress(completed * stepCount + stepIndex + progress, totalWork),
+          );
           input = new File([result.bytes], `${file.name}.${outputExtension(result.mime)}`, {type: result.mime});
+          setProgress(completed * stepCount + stepIndex + 1, totalWork);
         }
         const directory = relativePath(file).split("/").slice(0, -1).join("/");
         const name = `${stem(file.name)}-${stem(state.recipe.name)}.${outputExtension(result.mime)}`;
@@ -2323,11 +2329,11 @@ async function runRecipe() {
         rememberOutput(outputs[outputs.length - 1]);
       }
       completed++;
-      setProgress(completed, files.length);
+      setProgress(completed * stepCount, totalWork);
       } catch (error) {
         outputs.push({source: file.name, sourcePath: relativePath(file), file, error: friendlyError(error)});
         completed++;
-        setProgress(completed, files.length);
+        setProgress(completed * stepCount, totalWork);
       }
     }
     await recoveryWrites;
@@ -2336,7 +2342,7 @@ async function runRecipe() {
     refreshJobLimit();
     renderResults();
     $("#result-summary").textContent = resultSummary(outputs);
-    setProgress(files.length, files.length);
+    setProgress(totalWork, totalWork);
     if (returnFocus) $("#result-list .result-download, #result-list .retry-result")?.focus();
     const failed = outputs.filter((result) => result.error).length;
     const succeeded = outputs.length - failed;
@@ -2458,12 +2464,19 @@ async function saveResultsToFolder(results) {
     cancelButton.onclick = null;
   };
   const chooseCollisionAction = (names) => new Promise((resolve) => {
+    const previousFocus = document.activeElement;
     const sample = names.length > 5 ? `${names.slice(0, 5).join(", ")} and ${names.length - 5} more` : names.join(", ");
     choiceText.textContent = `${names.length} file${names.length === 1 ? "" : "s"} already exist${names.length === 1 ? "s" : ""}: ${sample}.`;
     choice.hidden = false;
-    overwriteButton.onclick = () => { hideChoice(); resolve("overwrite"); };
-    keepButton.onclick = () => { hideChoice(); resolve("keep"); };
-    cancelButton.onclick = () => { hideChoice(); resolve("cancel"); };
+    requestAnimationFrame(() => overwriteButton.focus());
+    const finish = (action) => {
+      hideChoice();
+      previousFocus?.focus();
+      resolve(action);
+    };
+    overwriteButton.onclick = () => finish("overwrite");
+    keepButton.onclick = () => finish("keep");
+    cancelButton.onclick = () => finish("cancel");
   });
   const getDirectory = async (root, parts, create) => {
     let directory = root;
