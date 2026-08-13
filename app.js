@@ -460,12 +460,17 @@ function renderRecipe(id) {
   $("#recipe-steps").querySelectorAll("[data-step-json]").forEach((area) => area.onchange = () => {
     try {
       const index = Number(area.dataset.stepJson);
-      state.recipe.steps[index].operation = JSON.parse(area.value);
+      const operation = JSON.parse(area.value);
+      if (!operation || typeof operation !== "object" || Array.isArray(operation) || typeof operation.type !== "string" || !operation.type.trim())
+        throw new Error("Operation type is required.");
+      state.recipe.steps[index].operation = operation;
       state.recipe.steps[index].label = `${state.recipe.steps[index].tool} operation`;
       persistRecipeSettings();
       $("#recipe-status").textContent = "Step updated.";
-    } catch {
-      $("#recipe-status").textContent = "That step is not valid JSON yet.";
+    } catch (error) {
+      $("#recipe-status").textContent = error.message === "Operation type is required."
+        ? error.message
+        : "That step is not valid JSON yet.";
     }
   });
   $("#recipe-steps").querySelectorAll(".recipe-tool").forEach((select) => select.onchange = () => {
@@ -1439,7 +1444,7 @@ async function options() {
     const metadata = await inspectMetadata(state.files[0]);
     return {type: "metadata", mime: "image/jpeg", quality: 0.92, metadata: {mode: $("#metadataMode").value, ...metadata.fields}};
   }
-  if (id === "platform-profiles") return {type: "resize", mode: $("#platformMode").value, width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mime: $("#platformMime").value};
+  if (id === "platform-profiles") return {type: "resize", mode: $("#platformMode").value === "fill" ? "fill" : "dimensions", width: Number($("#platformWidth").value), height: Number($("#platformHeight").value), mime: $("#platformMime").value};
   if (id === "image-to-pdf") return {type: "pdf", pageSize: $("#pdfSize").value, orientation: $("#pdfOrientation").value, mode: $("#pdfMode").value, margin: Number($("#pdfMargin").value || 0)};
   if (id === "id-print-sheet") return {type: "id-sheet", profile: $("#idProfile").value, paper: $("#idPaper").value, copies: Number($("#idCopies").value || 1)};
   if (id === "svg-raster") return {type: "resize", mode: "exact", width: Number($("#svgWidth").value), height: Number($("#svgHeight").value), mime: "image/png"};
@@ -1903,6 +1908,14 @@ async function runRecipe() {
   if (!state.recipe) return;
   if (!files.length) {
     $("#recipe-status").textContent = "Choose files or a folder before running a recipe.";
+    return;
+  }
+  const invalidStep = state.recipe.steps.find((step) =>
+    !step?.operation || typeof step.operation !== "object" || Array.isArray(step.operation)
+      || typeof step.operation.type !== "string" || !step.operation.type.trim(),
+  );
+  if (invalidStep) {
+    $("#recipe-status").textContent = "Recipe cannot run until every step has an operation type.";
     return;
   }
   const message = await preflight(files);
