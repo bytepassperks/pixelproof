@@ -418,6 +418,23 @@ function allRecipes() {
     ),
   );
 }
+const recipeOperationTypes = new Map([
+  ["platform-profiles", "resize"],
+  ["image-to-pdf", "pdf"],
+  ["id-print-sheet", "id-sheet"],
+  ["svg-raster", "svg-raster"],
+]);
+function validateRecipeStep(step) {
+  if (!step || typeof step.tool !== "string" || typeof step.label !== "string" ||
+      step.label.length > 160 || !step.operation || typeof step.operation !== "object" ||
+      Array.isArray(step.operation)) return "Recipe contains an unknown or invalid operation.";
+  const expectedType = recipeOperationTypes.get(step.tool) || step.tool;
+  if (!toolDefs.some((tool) => tool.id === step.tool))
+    return `Recipe references unknown tool “${step.tool}”.`;
+  if (step.operation.type !== expectedType)
+    return `Recipe step “${step.label}” does not match its selected tool.`;
+  return "";
+}
 function initRecipes() {
   const select = $("#recipe-select");
   if (!select) return;
@@ -449,13 +466,18 @@ async function importRecipe(event) {
   try {
     const documentData = JSON.parse(await file.text());
     const recipe = documentData.recipe || (documentData.pipeline?.kind === "recipe" ? documentData.pipeline : null);
-    if (documentData.pixelproof !== 1 || documentData.formatVersion !== 2 || !recipe?.name || !Array.isArray(recipe.steps) || !recipe.steps.length || recipe.steps.length > 40) throw new Error("Not a valid PixelProof recipe file.");
+    if (documentData.pixelproof !== 1 || !recipe?.name || !Array.isArray(recipe.steps) || !recipe.steps.length || recipe.steps.length > 40) throw new Error("Not a valid PixelProof recipe file.");
+    if (documentData.formatVersion !== 2) {
+      if (Number(documentData.formatVersion) > 2) throw new Error("This recipe was created by a newer PixelProof release.");
+      throw new Error("This recipe uses an unsupported format version.");
+    }
     if (JSON.stringify(recipe).length > 65536) throw new Error("Recipe file is too large.");
     recipe.id = `custom-${Date.now()}`;
     recipe.name = String(recipe.name).trim().slice(0, 80);
     if (!recipe.name) throw new Error("Recipe name is empty.");
     recipe.steps.forEach((step) => {
-      if (!step?.tool || typeof step.label !== "string" || step.label.length > 160 || !step.operation || typeof step.operation !== "object" || Array.isArray(step.operation) || !toolDefs.some((tool) => tool.id === step.tool)) throw new Error("Recipe contains an unknown or invalid operation.");
+      const error = validateRecipeStep(step);
+      if (error) throw new Error(error);
     });
     const saved = readStoredArray(RECIPE_KEY);
     saved.push(recipe);
@@ -465,7 +487,8 @@ async function importRecipe(event) {
     renderRecipe(recipe.id);
     $("#recipe-status").textContent = `Imported recipe “${recipe.name}”.`;
   } catch (error) {
-    $("#recipe-status").textContent = `Recipe import failed: ${error.message}`;
+    const message = error instanceof SyntaxError ? "The recipe file is not valid JSON." : error.message;
+    $("#recipe-status").textContent = `Recipe import failed: ${message}`;
   }
   event.target.value = "";
 }
@@ -1346,16 +1369,23 @@ function mountPresetControls() {
     try {
       const document = JSON.parse(await file.text());
       const payload = document.pipeline;
-      if (document.pixelproof !== 1 || !payload?.name || !payload?.tool || !payload?.values || !toolDefs.some((tool) => tool.id === payload.tool) || typeof payload.values !== "object" || Array.isArray(payload.values)) throw new Error("Not a valid PixelProof pipeline file.");
+      if (document.pixelproof !== 1 || !payload?.name || !payload?.tool || !payload?.values ||
+          !toolDefs.some((tool) => tool.id === payload.tool) ||
+          typeof payload.values !== "object" || Array.isArray(payload.values))
+        throw new Error("Not a valid PixelProof pipeline file.");
+      if (JSON.stringify(payload).length > 65536) throw new Error("Pipeline file is too large.");
       payload.name = String(payload.name).trim().replace(/[^\w .-]+/g, "").slice(0, 80);
       if (!payload.name) throw new Error("Pipeline name is empty.");
+      if (Object.keys(payload.values).some((key) => typeof key !== "string" || key.length > 80))
+        throw new Error("Pipeline contains an invalid control value.");
       const next = readStoredArray("pixelproof-presets");
       next.push({name: payload.name, tool: payload.tool, values: payload.values});
       writeStoredJson("pixelproof-presets", next);
       if (payload.tool === state.tool) mountPresetControls();
       $("#run-status").textContent = `Imported pipeline “${payload.name}”.`;
     } catch (error) {
-      $("#run-status").textContent = `Pipeline import failed: ${error.message}`;
+      const message = error instanceof SyntaxError ? "The pipeline file is not valid JSON." : error.message;
+      $("#run-status").textContent = `Pipeline import failed: ${message}`;
     }
     event.target.value = "";
   };
@@ -2178,12 +2208,9 @@ async function runRecipe() {
     $("#recipe-status").textContent = "Choose files or a folder before running a recipe.";
     return;
   }
-  const invalidStep = state.recipe.steps.find((step) =>
-    !step?.operation || typeof step.operation !== "object" || Array.isArray(step.operation)
-      || typeof step.operation.type !== "string" || !step.operation.type.trim(),
-  );
+  const invalidStep = state.recipe.steps.find((step) => validateRecipeStep(step));
   if (invalidStep) {
-    $("#recipe-status").textContent = "Recipe cannot run until every step has an operation type.";
+    $("#recipe-status").textContent = validateRecipeStep(invalidStep);
     return;
   }
   const message = await preflight(files);
