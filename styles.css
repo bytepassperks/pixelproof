@@ -317,7 +317,7 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .proof-compare-stage{aspect-ratio:1024 / 1152;background:repeating-conic-gradient(#f5f5ef 0 25%,#d8d8d0 0 50%) 0/28px 28px;border:1px solid var(--rule);height:auto;overflow:hidden;position:relative;touch-action:none;user-select:none}
 .proof-compare-panel{height:100%;margin:0;position:absolute;width:100%}
 .proof-compare-panel img{-webkit-user-drag:none;background:transparent;display:block;height:100%;object-fit:contain;user-select:none;width:100%}
-.background-canvas,.tool-preview{user-select:none}
+.background-canvas,.tool-preview{touch-action:none;user-select:none}
 .proof-compare-original{z-index:1}
 .proof-compare-output{background:repeating-conic-gradient(#f5f5ef 0 25%,#d8d8d0 0 50%) 0/28px 28px;clip-path:inset(0 0 0 50%);z-index:2}
 .proof-compare-divider{background:var(--amber-bright);bottom:0;box-shadow:0 0 0 1px var(--darkroom-deep);left:50%;pointer-events:none;position:absolute;top:0;width:2px;z-index:3}

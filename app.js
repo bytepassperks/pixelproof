@@ -217,6 +217,15 @@ const state = {
   resultToolId: "",
   resultToolLabel: "",
 };
+let pendingServiceWorkerReload = false;
+function reloadWhenIdle() {
+  if (state.running) {
+    setTimeout(reloadWhenIdle, 250);
+    return;
+  }
+  pendingServiceWorkerReload = false;
+  window.location.reload();
+}
 const activeWorkers = new Map();
 function cancelActiveWorkers() {
   activeWorkers.forEach((cancel) => cancel());
@@ -600,7 +609,15 @@ document
   .forEach((el) => (el.textContent = PRODUCT.brand));
 if ("serviceWorker" in navigator) {
   if (navigator.serviceWorker.controller)
-    navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload());
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (state.running) {
+        pendingServiceWorkerReload = true;
+        announce("An app update is ready. It will be applied after this job finishes.", "success");
+        reloadWhenIdle();
+        return;
+      }
+      window.location.reload();
+    });
   navigator.serviceWorker.register("./sw.js", {updateViaCache: "none"}).catch(() => {});
 }
 document.title = `${PRODUCT.brand} — private image tools`;
@@ -1572,7 +1589,11 @@ function mountFaceBlur() {
     renderRegions();
   };
   $("#face-add-region").onclick = () => addRegion();
-  canvas.onpointerdown = (event) => { const rect = canvas.getBoundingClientRect(); start = {x: event.clientX - rect.left, y: event.clientY - rect.top}; };
+  canvas.onpointerdown = (event) => {
+    const rect = canvas.getBoundingClientRect();
+    start = {x: event.clientX - rect.left, y: event.clientY - rect.top};
+    canvas.setPointerCapture?.(event.pointerId);
+  };
   canvas.addEventListener("dragstart", (event) => event.preventDefault());
   canvas.addEventListener("selectstart", (event) => event.preventDefault());
   canvas.onpointerup = (event) => {
