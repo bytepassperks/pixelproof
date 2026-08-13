@@ -627,9 +627,7 @@ function renderPrivacySelfTest() {
 }
 async function renderLocalData() {
   const summary = await localDataSummary();
-  const format = (bytes) => bytes > 1024 * 1024
-    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
-    : `${Math.round(bytes / 1024)} KB`;
+  const format = formatBytes;
   $("#local-data-summary").innerHTML = [
     `<p><strong>Recovery outputs:</strong> ${format(summary.recovery)} · retained ${summary.recoveryRetention}</p>`,
     `<p><strong>Settings, recipes, profiles, presets, task count, licence state, key, and revalidation timestamp:</strong> ${format(summary.localStorage)}</p>`,
@@ -1434,7 +1432,7 @@ async function updateMetadata() {
   const metadata = await inspectMetadata(file);
   const fields = Object.entries(metadata.fields).filter(([key]) => !["gpsOffset", "gpsCoordinates", "gps"].includes(key));
   const coordinates = metadata.gpsCoordinates ? `<p class="metadata-warning">GPS coordinates: ${metadata.gpsCoordinates.latitude}, ${metadata.gpsCoordinates.longitude}. Strip metadata before sharing if that is not intentional.</p>` : (metadata.gps ? '<p class="metadata-warning">GPS data is present but its coordinates could not be decoded.</p>' : '<p>No GPS coordinates were found in the readable EXIF block.</p>');
-  output.innerHTML = `<p><strong>${metadata.fieldCount ? `${metadata.fieldCount} metadata field${metadata.fieldCount === 1 ? "" : "s"} found` : "No readable EXIF fields found"}</strong> · ${Math.round(metadata.bytes / 1024)} KB · ${escapeHtml(metadata.format)}</p>${coordinates}<dl>${fields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
+  output.innerHTML = `<p><strong>${metadata.fieldCount ? `${metadata.fieldCount} metadata field${metadata.fieldCount === 1 ? "" : "s"} found` : "No readable EXIF fields found"}</strong> · ${formatBytes(metadata.bytes)} · ${escapeHtml(metadata.format)}</p>${coordinates}<dl>${fields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
 }
 function editorOperation() {
   return {
@@ -2152,7 +2150,7 @@ async function runPdfWorkspace(runFiles) {
     renderResults();
     setProgress(1, 1);
     const total = state.results.reduce((sum, result) => sum + result.bytes.byteLength, 0);
-    $("#run-status").textContent = `PDF ready: ${Math.round(total / 1024)} KB across ${state.results.length} file${state.results.length === 1 ? "" : "s"}.`;
+    $("#run-status").textContent = `PDF ready: ${formatBytes(total)} across ${state.results.length} file${state.results.length === 1 ? "" : "s"}.`;
     recordTask();
     refreshJobLimit();
   } catch (error) {
@@ -2339,7 +2337,7 @@ function renderCompare(result) {
   const sourceUrl = URL.createObjectURL(state.files[0]);
   const resultUrl = URL.createObjectURL(new Blob([result.bytes], {type: result.mime}));
   state.compareUrls.push(sourceUrl, resultUrl);
-  output.innerHTML = `<div class="compare-stage"><img src="${sourceUrl}" alt="Original"><img id="compare-result" src="${resultUrl}" alt="Compressed result"></div><label>Reveal result <input id="compare-slider" type="range" min="0" max="100" value="50"></label><p class="mono">Original ${Math.round(state.files[0].size / 1024)} KB · Result ${Math.round(result.bytes.byteLength / 1024)} KB</p>`;
+  output.innerHTML = `<div class="compare-stage"><img src="${sourceUrl}" alt="Original"><img id="compare-result" src="${resultUrl}" alt="Compressed result"></div><label>Reveal result <input id="compare-slider" type="range" min="0" max="100" value="50"></label><p class="mono">Original ${formatBytes(state.files[0].size)} · Result ${formatBytes(result.bytes.byteLength)}</p>`;
   $("#compare-slider").oninput = (event) => { $("#compare-result").style.clipPath = `inset(0 ${100 - event.target.value}% 0 0)`; };
 }
 function renderResults() {
