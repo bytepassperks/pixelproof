@@ -2091,15 +2091,14 @@ function renderResults() {
   const list = $("#result-list");
   state.urls.splice(0).forEach((url) => URL.revokeObjectURL(url));
   list.innerHTML = "";
+  const historyNote = $("#result-history-note");
+  if (historyNote) {
+    historyNote.textContent = state.resultNotice;
+    historyNote.hidden = !state.resultNotice;
+  }
   if (!state.resultNotice || !state.resultToolId) {
     state.resultToolId = state.tool;
     state.resultToolLabel = toolDefs.find((item) => item.id === state.tool)?.label || state.tool;
-  }
-  if (state.resultNotice) {
-    const notice = document.createElement("p");
-    notice.className = "result-history-note";
-    notice.textContent = state.resultNotice;
-    list.append(notice);
   }
   const good = state.results.filter((r) => r.bytes);
   for (const r of state.results) {
