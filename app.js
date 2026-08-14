@@ -1408,11 +1408,11 @@ function mountPresetControls() {
     row = document.createElement("div");
     row.id = "preset-actions";
     row.className = "preset-actions";
-    row.innerHTML = '<button class="text-button" id="save-preset">Save settings</button><select id="saved-preset" aria-label="Apply saved preset"><option value="">Apply saved preset…</option></select><button class="text-button" id="export-preset">Export pipeline</button><button class="text-button" id="import-preset">Import pipeline</button><input id="import-preset-file" type="file" accept="application/json,.json" hidden>';
+    row.innerHTML = '<button class="text-button" id="save-preset">Save settings</button><label class="preset-field" for="saved-preset"><span>Apply saved preset</span><select id="saved-preset" aria-label="Apply saved preset"><option value="">Choose a saved preset…</option></select></label><button class="text-button" id="export-preset">Export pipeline</button><button class="text-button" id="import-preset">Import pipeline</button><input id="import-preset-file" type="file" accept="application/json,.json" hidden>';
     $("#control-content").append(row);
   }
   const select = $("#saved-preset");
-  select.innerHTML = '<option value="">Apply saved preset…</option>';
+  select.innerHTML = '<option value="">Choose a saved preset…</option>';
   const presets = readStoredArray("pixelproof-presets");
   presets.filter((preset) => preset.tool === state.tool).forEach((preset, index) => {
     const option = document.createElement("option");

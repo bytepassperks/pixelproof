@@ -495,3 +495,30 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
     min-width:0
   }
 }
+
+.app-shell select{
+  appearance:none;
+  background-color:var(--darkroom-deep);
+  background-image:linear-gradient(45deg,transparent 50%,var(--amber) 50%),linear-gradient(135deg,var(--amber) 50%,transparent 50%);
+  background-position:calc(100% - 14px) 50%,calc(100% - 9px) 50%;
+  background-repeat:no-repeat;
+  background-size:5px 5px,5px 5px;
+  border:1px solid var(--rule);
+  border-radius:0;
+  box-shadow:none;
+  color:var(--paper);
+  font-family:var(--data-face);
+  font-size:11px;
+  font-variant-numeric:tabular-nums;
+  min-height:42px;
+  padding:10px 28px 10px 10px
+}
+.app-shell select:hover:not(:disabled){border-color:var(--paper-dim)}
+.app-shell select:focus-visible{border-color:var(--amber);box-shadow:0 0 0 3px var(--darkroom),0 0 0 5px var(--amber);outline:0}
+.app-shell select:disabled{background-color:var(--sleeve);border-color:var(--rule-soft);color:var(--paper-dim);cursor:not-allowed;opacity:.58}
+.app-shell .preset-actions{align-items:end;border-color:var(--rule);gap:var(--space-3)}
+.app-shell .preset-field{display:grid;gap:7px;min-width:220px}
+.app-shell .preset-field span{color:var(--paper-dim);font:500 10px var(--data-face);letter-spacing:.12em;line-height:1.2;min-height:1.2em}
+@media(max-width:600px){
+  .app-shell .preset-field{min-width:0;width:100%}
+}
