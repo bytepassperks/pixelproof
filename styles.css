@@ -519,6 +519,11 @@ button:disabled,.btn:disabled{background:var(--sleeve);border-color:var(--rule-s
 .app-shell .preset-actions{align-items:end;border-color:var(--rule);gap:var(--space-3)}
 .app-shell .preset-field{display:grid;gap:7px;min-width:220px}
 .app-shell .preset-field span{color:var(--paper-dim);font:500 10px var(--data-face);letter-spacing:.12em;line-height:1.2;min-height:1.2em}
+.app-shell .result-summary:empty,.app-shell .result-history-note:empty{display:none}
+.app-shell .estimate-field{grid-column:1/-1}
+.app-shell #size-estimate{display:block;line-height:1.45;max-width:100%;overflow-wrap:normal;white-space:normal}
+.app-shell .preset-actions>.text-button{align-items:center;display:inline-flex;min-height:42px}
 @media(max-width:600px){
   .app-shell .preset-field{min-width:0;width:100%}
+  .app-shell .estimate-field{grid-column:auto}
 }
