@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Activate PixelProof</title>
+  <link rel="canonical" href="https://pixelproof.pages.dev/activate">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="landing activation-page">
+  <header class="landing-nav"><a class="brand" href="./"><span class="brand-mark">PP</span><span data-brand>PixelProof</span></a><a class="btn" href="app.html">Open workbench</a></header>
+  <main class="activation-wrap">
+    <section class="activation-card">
+      <p class="eyebrow">PIXELPROOF / ACTIVATION</p>
+      <h1>Turn on your lifetime plan.</h1>
+      <p>Paste the licence key from your receipt. It stays in this browser and is revalidated periodically. You can use the plan on your own devices; PixelProof does not promise a specific device count.</p>
+      <form id="activation-form">
+        <label for="license-key">Licence key</label>
+        <input id="license-key" autocomplete="off" spellcheck="false" placeholder="Paste your key">
+        <button class="btn primary" type="submit">Activate locally <span>→</span></button>
+      </form>
+      <p id="activation-status" class="mono landing-status" role="status"></p>
+      <p class="hint">Key missing, lost, or rejected? Check your Dodo customer portal or receipt first, then <a href="contact.html">contact a human</a>. Do not buy again before we help.</p>
+    </section>
+  </main>
+  <footer><span data-brand>PixelProof</span><span>IMAGE BYTES STAY LOCAL · <a href="privacy-policy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="refunds.html">Refunds</a> · <a href="contact.html">Contact</a></span></footer>
+  <script type="module" src="activation.js"></script>
+</body>
+</html>

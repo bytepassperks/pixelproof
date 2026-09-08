@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#090908"/>
+  <rect x="54" y="54" width="1092" height="522" fill="#1b1a17" stroke="#e6a84a" stroke-width="2"/>
+  <path d="M82 82h1036v468H82z" fill="none" stroke="#f1eee6" stroke-width="1" opacity=".22"/>
+  <rect x="110" y="108" width="62" height="62" fill="#e6a84a"/>
+  <path d="M127 153v-30h12c9 0 14 5 14 12s-5 12-14 12h-4v6h-8zm8-14h4c4 0 6-1 6-4s-2-4-6-4h-4v8z" fill="#090908"/>
+  <text x="110" y="280" fill="#f1eee6" font-family="Georgia,serif" font-size="82">Keep the pixels.</text>
+  <text x="110" y="380" fill="#ffd18a" font-family="Georgia,serif" font-size="82">Lose the upload.</text>
+  <path d="M110 420h420" stroke="#e6a84a" stroke-width="3"/>
+  <text x="110" y="492" fill="#c4bfb2" font-family="monospace" font-size="22">LOCAL IMAGE WORK · NO SERVER INFERENCE</text>
+</svg>

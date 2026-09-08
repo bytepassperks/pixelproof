@@ -1,0 +1,13 @@
+name = "pixelproof-license"
+main = "src/index.ts"
+compatibility_date = "2026-08-11"
+account_id = "ed43fb9aedda947029c20ca03959f8da"
+
+[vars]
+PAGES_ORIGIN = "https://pixelproof.pages.dev"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pixelproof-licenses"
+database_id = "f9fd28ea-edaf-459b-9210-ddefa75dfc07"
+migrations_dir = "migrations"

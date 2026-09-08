@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Compress image, resize, convert HEIC to JPG, and turn images to PDF locally in your browser. Image bytes stay local; the app downloads code and models but never sends image data.">
+  <meta name="theme-color" content="#12203a">
+  <link rel="canonical" href="https://pixelproof.pages.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PixelProof">
+  <meta property="og:title" content="PixelProof — compress image and make PDFs locally">
+  <meta property="og:description" content="Compress image, resize, convert HEIC to JPG, and create PDFs in your browser. Your files stay local.">
+  <meta property="og:url" content="https://pixelproof.pages.dev/">
+  <meta property="og:image" content="https://pixelproof.pages.dev/social-preview.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PixelProof — private image work">
+  <meta name="twitter:description" content="Compress image, resize, convert HEIC to JPG, and create PDFs locally without uploads.">
+  <meta name="twitter:image" content="https://pixelproof.pages.dev/social-preview.svg">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <title>Compress image, HEIC to JPG, images to PDF — PixelProof</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.webmanifest">
+</head>
+<body class="landing">
+  <header class="landing-nav">
+    <a class="brand" href="./"><span class="brand-mark">PP</span><span data-brand>PixelProof</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#tools">Tools</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+          <a class="btn" href="app.html">Work in the browser</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero landing-section">
+      <div class="hero-copy">
+        <p class="eyebrow">PRIVATE IMAGE WORK / BROWSER-LOCAL</p>
+        <h1>Image work in the browser.</h1>
+        <p class="hero-lede">Compress image, resize a folder, convert HEIC to JPG, or turn images to PDF in one local batch recipe. Inspect every step, see the bytes and dimensions, and export without uploading your files.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="app.html">Open the workbench</a>
+          <a class="btn" href="#pricing">View plans</a>
+        </div>
+        <p class="hero-note mono">IMAGE BYTES STAY LOCAL · NO PROCESSING CREDITS · NO WATERMARK · LIMITS SHOWN BEFORE PROCESSING</p>
+      </div>
+      <div class="hero-card card-offset">
+        <div class="mock-window">
+          <div class="mock-top"><span>PIXELPROOF / IMAGE WORKBENCH</span><span class="mock-dot"></span></div>
+          <div class="mock-body"><span class="eyebrow">ASSISTED / BACKGROUND</span><h2>Click the subject.<br>Keep the edges.</h2><div class="mock-image"><picture><source media="(max-width: 600px)" srcset="./vendor/images/pixelproof-dog-hero-512.webp"><img src="./vendor/images/pixelproof-dog-hero-1024.webp" srcset="./vendor/images/pixelproof-dog-hero-512.webp 512w, ./vendor/images/pixelproof-dog-hero-1024.webp 1024w" sizes="(max-width: 600px) 512px, 1024px" width="1024" height="1152" alt="PixelProof refined background-removal result showing a brown dog over a transparency checkerboard" decoding="async"></picture></div><div class="mock-annotation" aria-label="Output metadata"><span>1024 × 1152 · 107 KB · WEBP · ALPHA</span></div><div class="mock-line"></div><div class="mock-line short"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="proof-compare landing-section" aria-labelledby="proof-compare-title">
+      <div class="section-heading">
+        <p class="eyebrow">BACKGROUND REMOVAL</p>
+        <h2 id="proof-compare-title">Select a subject and preserve its edges.</h2>
+        <p>Compare the same 1,024 × 1,152 photograph with its transparent cutout: the original blue studio background on one side, refined alpha on the other.</p>
+      </div>
+      <div class="proof-compare-card">
+        <div class="proof-compare-stage" id="proof-compare-stage">
+          <figure class="proof-compare-panel proof-compare-original">
+            <img draggable="false" src="./vendor/images/pixelproof-sample-photo.jpg" alt="Original sample photograph of a single brown dog on a plain blue studio background" loading="lazy" decoding="async">
+          </figure>
+          <figure class="proof-compare-panel proof-compare-output" id="proof-compare-output">
+            <img draggable="false" src="./vendor/images/pixelproof-comparison-cutout.webp" alt="PixelProof transparent cutout of the same brown dog displayed over a checkerboard" loading="lazy" decoding="async">
+          </figure>
+          <div class="proof-compare-divider" aria-hidden="true"></div>
+          <div class="proof-compare-handle" aria-hidden="true"></div>
+          <input id="proof-compare-slider" type="range" min="0" max="100" value="50" aria-label="Compare the 1,024 by 1,152 original photograph with the transparent PixelProof background-removal cutout">
+        </div>
+        <div class="proof-compare-copy">
+          <p class="proof-compare-instruction mono">Drag the split or use the arrow keys.</p>
+          <div class="proof-compare-legend"><span>ORIGINAL PHOTOGRAPH<strong>166,171 bytes · JPEG</strong></span><span>TRANSPARENT CUTOUT<strong>407,966 bytes · WEBP · ALPHA · REFINED</strong></span></div>
+          <p class="proof-compare-note mono">Both layers use the same 1,024 × 1,152 source pixels. Background removal preserves the subject with refined alpha.</p>
+          <p class="proof-compare-compression mono">Compression comparison: 166,171 → 63,891 bytes · 57.2% smaller at the same dimensions.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="trust-strip"><span>FILES STAY IN YOUR BROWSER</span><span>NO SERVER-SIDE IMAGE PROCESSING</span><span>LOCAL WORKER PIPELINE</span></section>
+
+    <section id="tools" class="landing-section tools-section">
+      <div class="section-heading"><p class="eyebrow">WORKFLOWS</p><h2>Recipes for complete image jobs.</h2><p>Choose a workflow for web images, product photos, social formats, target-size compression, responsive image sets, watermark batches, or local sharing. Edit every step when you need control.</p></div>
+      <div class="tool-cards">
+        <article class="landing-card"><span class="card-number">01</span><h3>Web optimizer</h3><p>Fit, convert, strip metadata, and compress a whole folder for the web.</p></article>
+        <article class="landing-card accent-card"><span class="card-number">02</span><h3>Product photos</h3><p>Make a consistent product batch without uploading originals or paying per image.</p></article>
+        <article class="landing-card"><span class="card-number">03</span><h3>Social pack</h3><p>Generate square, portrait, and story-ready outputs from each source.</p></article>
+        <article class="landing-card yellow-card"><span class="card-number">04</span><h3>Private sharing</h3><p>See GPS and camera metadata, strip it explicitly, then review privacy boxes before blur export.</p></article>
+        <article class="landing-card"><span class="card-number">05</span><h3>Image to PDF</h3><p>Reorder pages, choose A4 or Letter, fit or fill, set margins, and export one compact local PDF or one per image.</p></article>
+        <article class="landing-card accent-card"><span class="card-number">06</span><h3>Guidance, not guarantees</h3><p>Editable platform starting points plus dimensions-only ID print sheets. Published guidance changes; PixelProof does not promise acceptance.</p></article>
+      </div>
+    </section>
+
+    <section class="benefit-band landing-section">
+      <div><p class="eyebrow">LOCAL PROCESSING</p><h2>Image bytes stay in the browser.</h2></div>
+      <div class="benefit-list"><p><strong>Private.</strong> Image bytes stay in your browser. The app downloads its own code and background-removal models; checkout and licence validation carry no image data.</p><p><strong>Practical.</strong> Limits are stated before processing, folders stay organized, and ZIP is always available.</p><p><strong>Honest.</strong> JPEG, PNG, WebP, AVIF, HEIC/HEIF, BMP, static GIF, ICO, and SVG input are supported. Animated inputs warn and use only the first frame.</p><p><strong>Bounded.</strong> No JPEG XL, RAW/DNG, animated conversion, GIF-to-MP4, raster-to-vector, PDF-to-image, automatic face detection, automatic background removal, or AI upscale.</p></div>
+    </section>
+
+    <section class="comparison landing-section">
+      <div class="section-heading"><p class="eyebrow">AT A GLANCE</p><h2>How PixelProof compares.</h2></div>
+      <div class="comparison-wrap" tabindex="0" role="region" aria-label="PixelProof capability comparison"><table><thead><tr><th>Capability</th><th>PixelProof</th><th>Typical online editor</th><th>Desktop editor</th></tr></thead><tbody><tr><td>Image bytes leave the device</td><td class="yes">No</td><td>Usually yes</td><td class="yes">No</td></tr><tr><td>Pricing model</td><td class="yes">Free or lifetime</td><td>Subscription / credits</td><td>Purchase or subscription</td></tr><tr><td>Offline after first load</td><td class="yes">Core jobs</td><td>Usually no</td><td class="yes">Yes</td></tr><tr><td>Batch ceiling shown before work</td><td class="yes">Yes</td><td>Plan-dependent</td><td>Usually yes</td></tr><tr><td>Target byte-size compression</td><td class="yes">Per image</td><td>Often absent</td><td>Usually manual</td></tr><tr><td>Metadata inspection and stripping</td><td class="yes">Visible</td><td>Often hidden</td><td>Usually available</td></tr><tr><td>Exportable local pipelines</td><td class="yes">Included</td><td>Rare</td><td>Usually manual</td></tr><tr><td>Background removal</td><td class="yes">Prompted, paid tiers</td><td>Often automatic</td><td>Usually available</td></tr><tr><td>Format breadth</td><td>Focused browser set</td><td>Service-dependent</td><td class="yes">Often broader</td></tr><tr><td>Team collaboration</td><td>Not included</td><td class="yes">Often included</td><td>Usually separate</td></tr></tbody></table></div>
+    </section>
+
+    <section id="pricing" class="pricing landing-section">
+      <div class="section-heading"><p class="eyebrow">PRICING</p><h2>Plans for local image work.</h2><p>Prices shown are current working values.</p></div>
+      <div class="pricing-grid">
+        <article class="price-card"><p class="eyebrow">FREE</p><h3>$0</h3><p>Core workbench access in the browser.</p><ul><li>10 tasks per day</li><li>Batches up to 5 files</li><li>Core image tools</li><li class="excluded">Background removal not included</li></ul><button class="btn" data-checkout="free">Use free plan</button></article>
+        <article class="price-card featured"><p class="eyebrow">LIFETIME SOLO</p><h3>$49 <small>one payment</small></h3><p>For one person processing images locally.</p><ul><li>No daily job limit</li><li>Batches up to 100 files</li><li>Prompted alpha cutout</li><li>Personal use</li></ul><button class="btn primary" data-checkout="solo">Select Solo <span>→</span></button></article>
+        <article class="price-card"><p class="eyebrow">LIFETIME STUDIO</p><h3>$99 <small>one payment</small></h3><p>For a small team processing client images.</p><ul><li>No daily job limit</li><li>Batches up to 250 files</li><li>Prompted alpha cutout</li><li>Commercial and client use</li></ul><button class="btn" data-checkout="studio">Select Studio</button></article>
+      </div>
+      <p id="checkout-status" class="mono landing-status" role="status"></p>
+    </section>
+
+    <section class="trust-proof landing-section"><div class="section-heading"><p class="eyebrow">OFFLINE OPERATION</p><h2>Load one payment. Turn off your network. Keep working.</h2><p>After the app shell is cached, run a normal JPEG, HEIC, or images-to-PDF job with your network disabled. Your image bytes stay in the browser. First-use background-removal models, checkout, licence validation, and updates need a connection.</p><p><a class="btn" href="app.html">Open the privacy self-test</a></p></div></section>
+    <section id="faq" class="faq landing-section">
+      <div class="section-heading"><p class="eyebrow">FAQ</p><h2>Product information.</h2></div>
+      <div class="faq-list"><details><summary>Do my images get uploaded?</summary><p>Image bytes stay in your browser. PixelProof has no image upload endpoint. The app downloads its own code and, on first background-removal use, model files. Checkout and licence validation carry no image data.</p></details><details><summary>What is stored locally?</summary><p>Completed outputs are kept for up to 24 hours for recovery. Settings, recipes, profiles, presets, licence state, and optional model files remain until you clear them. The workbench shows sizes and provides clear buttons.</p></details><details><summary>What is a task?</summary><p>A task means one submitted job. A recipe counts once even when it creates multiple output files. Free includes 10 jobs per day and batches up to 5 input files.</p></details><details><summary>Can I verify the privacy claim?</summary><p>Yes. Open the workbench's How it works panel for a self-test and local-data inventory. You can also load the app, turn off your network, and process a normal JPEG, HEIC, or PDF job after the shell is cached. First-use background-removal models, checkout, licence validation, and updates need a connection.</p></details><details><summary>What is a recipe?</summary><p>A recipe is an editable sequence of existing tools for a complete job, such as making a folder web-ready or generating a social pack. You can inspect each operation, change it, save it, and export it for a teammate.</p></details><details><summary>Can I make a PDF?</summary><p>Yes. Image to PDF accepts multiple images, supports drag reordering, A4, Letter or matching image size, orientation, margins, fit/fill, and one combined PDF or one PDF per image. Inputs are re-encoded locally to keep output sizes practical.</p></details><details><summary>What formats are supported?</summary><p>JPEG, PNG, WebP, AVIF output, HEIC/HEIF, BMP, static GIF, ICO, and SVG input. Animated GIF, APNG, and WebP are detected before processing and only their first frame is used. AVIF input, JPEG XL, RAW/DNG, animated conversion, GIF-to-MP4, raster-to-vector, and PDF-to-image are not shipped.</p></details><details><summary>Are platform profiles guarantees?</summary><p>No. They are editable starting points based on published guidance, with a source URL and checked date. Platform requirements change and PixelProof does not claim approval or compliance.</p></details><details><summary>Do ID photos meet government requirements?</summary><p>No claim is made. The ID print-sheet tool handles physical dimensions and paper layout only. It does not check face position, expression, lighting, background, editing rules, eligibility, or application acceptance.</p></details><details><summary>Are there credits or surprise watermarks?</summary><p>No image-processing credits and no surprise watermark. Free limits are stated before processing, and lifetime plans have their batch ceilings shown up front.</p></details><details><summary>Can I hit a specific file size?</summary><p>Yes. Target-size compression searches quality separately for every image. If the byte budget is impossible at the current dimensions, PixelProof says so and can optionally reduce dimensions.</p></details><details><summary>What metadata is removed?</summary><p>The Metadata tool shows readable EXIF fields, including camera, timestamps, software, and GPS presence. You can strip all metadata or keep copyright and orientation when exporting JPEG.</p></details><details><summary>Do folder paths survive?</summary><p>Yes. Relative paths remain visible in results and are preserved in ZIP exports or in a folder you choose in supported Chromium browsers. ZIP is the portable fallback on Safari and Firefox.</p></details><details><summary>Can I paste a screenshot?</summary><p>Yes. Focus the workbench and press Ctrl+V or ⌘V with an image on the clipboard. Text-only paste is left alone.</p></details><details><summary>Is background removal automatic?</summary><p>No. It is click-to-select, with keyboard coordinates available for positioning the selection point. You choose the subject, and the browser refines that selection into continuous alpha. It is not automatic face detection.</p></details></div>
+    </section>
+
+    <section class="final-cta landing-section"><p class="eyebrow">WORKBENCH</p><h2>Process images without uploading them.</h2><a class="btn primary" href="app.html">Open PixelProof</a></section>
+  </main>
+  <footer><span data-brand>PixelProof</span><span>PRIVATE IMAGE WORK / v1</span><span>IMAGE BYTES STAY LOCAL · <a href="privacy-policy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="refunds.html">Refunds</a> · <a href="contact.html">Contact</a></span></footer>
+  <script type="module" src="landing.js"></script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"PixelProof","applicationCategory":"MultimediaApplication","operatingSystem":"Web browser","url":"https://pixelproof.pages.dev/","description":"Private browser-local image tools for compressing, resizing, converting HEIC to JPG, and creating PDFs without uploading files.","offers":{"@type":"Offer","price":"49","priceCurrency":"USD"},"featureList":["Compress image","Resize image","HEIC to JPG","Images to PDF","Batch folder processing"]}</script>
+</body>
+</html>
